@@ -7,6 +7,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
 import net.secorp.rssreader.BuildConfig
+import net.secorp.rssreader.auth.AuthInterceptor
+import net.secorp.rssreader.data.api.AuthApi
 import net.secorp.rssreader.data.api.RssApi
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -27,7 +29,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttp(): OkHttpClient {
+    fun provideOkHttp(authInterceptor: AuthInterceptor): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) {
                 HttpLoggingInterceptor.Level.BODY
@@ -36,6 +38,7 @@ object NetworkModule {
             }
         }
         return OkHttpClient.Builder()
+            .addInterceptor(authInterceptor)
             .addInterceptor(logging)
             .build()
     }
@@ -54,4 +57,9 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideRssApi(retrofit: Retrofit): RssApi = retrofit.create(RssApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideAuthApi(retrofit: Retrofit): AuthApi = retrofit.create(AuthApi::class.java)
 }
+
