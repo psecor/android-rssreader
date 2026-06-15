@@ -5,8 +5,12 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import java.time.Instant
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 import net.secorp.rssreader.BuildConfig
+import net.secorp.rssreader.data.api.InstantIso8601Serializer
 import net.secorp.rssreader.auth.AuthInterceptor
 import net.secorp.rssreader.data.api.AuthApi
 import net.secorp.rssreader.data.api.RssApi
@@ -25,6 +29,9 @@ object NetworkModule {
     fun provideJson(): Json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
+        serializersModule = SerializersModule {
+            contextual(Instant::class, InstantIso8601Serializer)
+        }
     }
 
     @Provides
