@@ -34,9 +34,11 @@ android {
 
     buildTypes {
         debug {
-            // Real device dev: pair with `adb reverse tcp:3001 tcp:3001` so the
-            // phone's localhost:3001 routes to the Mac's localhost:3001.
-            buildConfigField("String", "API_BASE_URL", "\"http://localhost:3001/\"")
+            // Defaults to production for everyday on-device testing. For local
+            // backend dev, override here to "http://localhost:3001/" and run
+            // `adb reverse tcp:3001 tcp:3001` with the backend listening on 3001
+            // on the Mac.
+            buildConfigField("String", "API_BASE_URL", "\"https://secorp.net/rssreader/\"")
             isDebuggable = true
         }
         release {

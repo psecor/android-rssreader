@@ -41,6 +41,7 @@ import net.secorp.rssreader.data.db.dao.FeedWithUnread
 @Composable
 fun FeedListScreen(
     onFeedClick: (Long) -> Unit,
+    onAllItemsClick: () -> Unit,
     onSignOut: () -> Unit,
     viewModel: FeedListViewModel = hiltViewModel(),
 ) {
@@ -86,6 +87,10 @@ fun FeedListScreen(
                     .padding(inner),
                 contentPadding = PaddingValues(vertical = 8.dp),
             ) {
+                item(key = "all-items") {
+                    AllItemsRow(unreadCount = state.totalUnread, onClick = onAllItemsClick)
+                    HorizontalDivider()
+                }
                 state.groups.forEach { group ->
                     item(key = "cat-${group.category.id}") {
                         CategoryHeader(name = group.category.name)
@@ -116,6 +121,28 @@ private fun CategoryHeader(name: String) {
             .padding(horizontal = 16.dp, vertical = 12.dp),
     )
     HorizontalDivider()
+}
+
+@Composable
+private fun AllItemsRow(unreadCount: Int, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "All items",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f),
+        )
+        if (unreadCount > 0) {
+            Badge(modifier = Modifier.padding(start = 8.dp)) {
+                Text(unreadCount.toString())
+            }
+        }
+    }
 }
 
 @Composable

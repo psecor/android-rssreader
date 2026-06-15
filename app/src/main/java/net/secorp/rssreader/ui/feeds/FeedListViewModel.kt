@@ -20,6 +20,7 @@ data class FeedGroup(
 )
 
 data class FeedListUiState(
+    val totalUnread: Int = 0,
     val groups: List<FeedGroup> = emptyList(),
     val uncategorized: List<FeedWithUnread> = emptyList(),
 )
@@ -34,14 +35,19 @@ class FeedListViewModel @Inject constructor(
     val state: StateFlow<FeedListUiState> = combine(
         rssRepository.observeCategories(),
         rssRepository.observeFeedsWithUnread(),
-    ) { categories, feeds ->
+        rssRepository.observeTotalUnread(),
+    ) { categories, feeds, totalUnread ->
         val feedsByCategory = feeds.groupBy { it.categoryId }
         val groups = categories.map { c ->
             FeedGroup(category = c, feeds = feedsByCategory[c.id].orEmpty())
         }
         val knownCategoryIds = categories.mapTo(mutableSetOf()) { it.id }
         val uncategorized = feeds.filter { it.categoryId !in knownCategoryIds }
-        FeedListUiState(groups = groups, uncategorized = uncategorized)
+        FeedListUiState(
+            totalUnread = totalUnread,
+            groups = groups,
+            uncategorized = uncategorized,
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
