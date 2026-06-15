@@ -25,9 +25,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -89,11 +92,63 @@ fun ItemListScreen(
                 contentPadding = PaddingValues(vertical = 4.dp),
             ) {
                 items(items = state.items, key = { it.id }) { item ->
-                    ItemRow(item = item, onClick = { onItemClick(item.id) })
+                    SwipeableItemRow(
+                        item = item,
+                        onClick = { onItemClick(item.id) },
+                        onToggleRead = { viewModel.setRead(item.id, !item.isRead) },
+                    )
                     HorizontalDivider()
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeableItemRow(
+    item: FeedItemEntity,
+    onClick: () -> Unit,
+    onToggleRead: () -> Unit,
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        // Return false so the row snaps back instead of being removed — we're
+        // toggling read state, not dismissing. Side-effect the toggle from
+        // here because confirmValueChange fires exactly once per completed
+        // swipe gesture.
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                onToggleRead()
+            }
+            false
+        },
+    )
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            val markingRead = !item.isRead
+            val bg = if (markingRead) MaterialTheme.colorScheme.primaryContainer
+                     else MaterialTheme.colorScheme.tertiaryContainer
+            val fg = if (markingRead) MaterialTheme.colorScheme.onPrimaryContainer
+                     else MaterialTheme.colorScheme.onTertiaryContainer
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(bg)
+                    .padding(horizontal = 24.dp),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Text(
+                    text = if (markingRead) "Mark read" else "Mark unread",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = fg,
+                )
+            }
+        },
+    ) {
+        ItemRow(item = item, onClick = onClick)
     }
 }
 
@@ -107,6 +162,9 @@ private fun ItemRow(item: FeedItemEntity, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            // Solid surface so the swipe background only shows on actual swipe,
+            // not through the resting row.
+            .background(MaterialTheme.colorScheme.surface)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.Top,

@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import net.secorp.rssreader.data.db.entity.FeedEntity
 import net.secorp.rssreader.data.db.entity.FeedItemEntity
 import net.secorp.rssreader.data.repo.RssRepository
@@ -28,7 +29,7 @@ data class ItemListUiState(
 @HiltViewModel
 class ItemListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    rssRepository: RssRepository,
+    private val rssRepository: RssRepository,
     private val syncScheduler: SyncScheduler,
 ) : ViewModel() {
 
@@ -75,4 +76,8 @@ class ItemListViewModel @Inject constructor(
     }
 
     fun refresh() = syncScheduler.enqueueOneShot()
+
+    fun setRead(itemId: Long, isRead: Boolean) {
+        viewModelScope.launch { rssRepository.markRead(itemId, isRead = isRead) }
+    }
 }
