@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import net.secorp.rssreader.data.api.AuthApi
 import net.secorp.rssreader.data.api.AuthUser
 import net.secorp.rssreader.data.api.MobileAuthRequest
+import net.secorp.rssreader.data.sync.SyncScheduler
 
 sealed interface AuthState {
     data object Unknown : AuthState
@@ -19,6 +20,7 @@ sealed interface AuthState {
 class AuthRepository @Inject constructor(
     private val authApi: AuthApi,
     private val tokenStore: TokenStore,
+    private val syncScheduler: SyncScheduler,
 ) {
     private val _state = MutableStateFlow<AuthState>(AuthState.Unknown)
     val state: StateFlow<AuthState> = _state.asStateFlow()
@@ -35,10 +37,12 @@ class AuthRepository @Inject constructor(
         val response = authApi.signInWithGoogle(MobileAuthRequest(idToken))
         tokenStore.setToken(response.token)
         _state.value = AuthState.SignedIn(user = response.user)
+        syncScheduler.enqueueOneShot()
     }
 
     fun signOut() {
         tokenStore.clear()
         _state.value = AuthState.SignedOut
+        syncScheduler.cancelAll()
     }
 }
