@@ -40,9 +40,19 @@ class RssRepository @Inject constructor(
     fun observeItems(
         feedId: Long?,
         onlyUnread: Boolean,
+        query: String = "",
         limit: Int = DEFAULT_ITEM_LIMIT,
-    ): Flow<List<FeedItemEntity>> =
-        feedItemDao.observe(feedId = feedId, onlyUnread = onlyUnread, limit = limit)
+    ): Flow<List<FeedItemEntity>> {
+        // Empty query → "%" which matches every row, so the LIKE collapses to
+        // a no-op. Keeping the LIKE always-on avoids two DAO methods.
+        val pattern = if (query.isBlank()) "%" else "%${query.trim()}%"
+        return feedItemDao.observe(
+            feedId = feedId,
+            onlyUnread = onlyUnread,
+            searchPattern = pattern,
+            limit = limit,
+        )
+    }
 
     fun observeTotalUnread(): Flow<Int> = feedItemDao.observeTotalUnread()
 

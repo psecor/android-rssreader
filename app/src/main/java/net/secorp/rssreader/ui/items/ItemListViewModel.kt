@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import net.secorp.rssreader.data.db.entity.FeedEntity
@@ -23,6 +24,8 @@ data class ItemListUiState(
     val title: String = "Items",
     val items: List<FeedItemEntity> = emptyList(),
     val onlyUnread: Boolean = false,
+    val searchActive: Boolean = false,
+    val query: String = "",
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -39,26 +42,50 @@ class ItemListViewModel @Inject constructor(
     private val _onlyUnread = MutableStateFlow(false)
     val onlyUnread: StateFlow<Boolean> = _onlyUnread.asStateFlow()
 
+    private val _searchActive = MutableStateFlow(false)
+    private val _query = MutableStateFlow("")
+
     private val feedFlow = rssRepository.observeFeeds()
 
     val state: StateFlow<ItemListUiState> = combine(
         feedFlow,
         _onlyUnread,
-    ) { feeds, unread -> feeds to unread }
-        .flatMapLatest { (feeds, unread) ->
-            val title = feedTitle(feeds)
-            rssRepository.observeItems(feedId = feedId, onlyUnread = unread)
-                .let { items ->
-                    combine(items, _onlyUnread) { list, u ->
-                        ItemListUiState(title = title, items = list, onlyUnread = u)
-                    }
-                }
+        _searchActive,
+        _query,
+    ) { feeds, unread, searchActive, query ->
+        FilterInputs(feeds = feeds, onlyUnread = unread, searchActive = searchActive, query = query)
+    }
+        .flatMapLatest { inputs ->
+            val title = feedTitle(inputs.feeds)
+            // Empty query when search bar is closed; the DAO collapses an
+            // empty query to a "%" no-op LIKE.
+            val effectiveQuery = if (inputs.searchActive) inputs.query else ""
+            rssRepository.observeItems(
+                feedId = feedId,
+                onlyUnread = inputs.onlyUnread,
+                query = effectiveQuery,
+            ).map { items ->
+                ItemListUiState(
+                    title = title,
+                    items = items,
+                    onlyUnread = inputs.onlyUnread,
+                    searchActive = inputs.searchActive,
+                    query = inputs.query,
+                )
+            }
         }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = ItemListUiState(title = if (feedId == null) "All items" else "Items"),
         )
+
+    private data class FilterInputs(
+        val feeds: List<FeedEntity>,
+        val onlyUnread: Boolean,
+        val searchActive: Boolean,
+        val query: String,
+    )
 
     val isRefreshing: StateFlow<Boolean> = syncScheduler.isReadSyncRunning
         .stateIn(
@@ -79,5 +106,18 @@ class ItemListViewModel @Inject constructor(
 
     fun setRead(itemId: Long, isRead: Boolean) {
         viewModelScope.launch { rssRepository.markRead(itemId, isRead = isRead) }
+    }
+
+    fun openSearch() {
+        _searchActive.value = true
+    }
+
+    fun closeSearch() {
+        _searchActive.value = false
+        _query.value = ""
+    }
+
+    fun setQuery(value: String) {
+        _query.value = value
     }
 }

@@ -15,9 +15,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -28,14 +33,26 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -57,25 +74,76 @@ fun ItemListScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val searchFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    // Local source-of-truth for the TextField. Binding the field directly to
+    // a StateFlow round-trips every keystroke through the VM and back, which
+    // lags one frame and causes dropped/garbled input on fast typing. The
+    // VM still gets every change via onValueChange below.
+    var queryInput by rememberSaveable { mutableStateOf("") }
+    LaunchedEffect(state.searchActive) {
+        if (state.searchActive) {
+            searchFocusRequester.requestFocus()
+        } else {
+            // Search closed elsewhere (back press, nav, etc.) — wipe local
+            // state so re-opening starts clean.
+            queryInput = ""
+        }
+    }
+    // System back closes search instead of leaving the screen, matching the
+    // convention every other Android app uses for in-place search bars.
+    BackHandler(enabled = state.searchActive) {
+        viewModel.closeSearch()
+    }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(state.title) },
+                title = {
+                    if (state.searchActive) {
+                        SearchField(
+                            query = queryInput,
+                            onQueryChange = {
+                                queryInput = it
+                                viewModel.setQuery(it)
+                            },
+                            onImeSearch = { keyboardController?.hide() },
+                            focusRequester = searchFocusRequester,
+                        )
+                    } else {
+                        Text(state.title)
+                    }
+                },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = {
+                        if (state.searchActive) viewModel.closeSearch() else onBack()
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
-                    FilterChip(
-                        selected = state.onlyUnread,
-                        onClick = { viewModel.toggleUnreadOnly() },
-                        label = { Text("Unread") },
-                        leadingIcon = if (state.onlyUnread) {
-                            { Icon(Icons.Default.Check, contentDescription = null) }
-                        } else null,
-                        modifier = Modifier.padding(end = 8.dp),
-                    )
+                    if (state.searchActive) {
+                        if (queryInput.isNotEmpty()) {
+                            IconButton(onClick = {
+                                queryInput = ""
+                                viewModel.setQuery("")
+                            }) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear search")
+                            }
+                        }
+                    } else {
+                        IconButton(onClick = { viewModel.openSearch() }) {
+                            Icon(Icons.Default.Search, contentDescription = "Search")
+                        }
+                        FilterChip(
+                            selected = state.onlyUnread,
+                            onClick = { viewModel.toggleUnreadOnly() },
+                            label = { Text("Unread") },
+                            leadingIcon = if (state.onlyUnread) {
+                                { Icon(Icons.Default.Check, contentDescription = null) }
+                            } else null,
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+                    }
                 },
             )
         },
@@ -102,6 +170,37 @@ fun ItemListScreen(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onImeSearch: () -> Unit,
+    focusRequester: FocusRequester,
+) {
+    TextField(
+        value = query,
+        onValueChange = onQueryChange,
+        placeholder = { Text("Search items") },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        // The list filters live as the user types, so the IME action just
+        // closes the keyboard to let them see the results.
+        keyboardActions = KeyboardActions(onSearch = { onImeSearch() }),
+        // Strip the TextField's own background/indicator so it visually blends
+        // into the TopAppBar instead of looking like a chip.
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.Transparent,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(focusRequester),
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
