@@ -34,6 +34,21 @@ class SyncScheduler @Inject constructor(
         )
     }
 
+    /** Push any pending mark-read/unread actions to the backend. */
+    fun enqueueWritePush() {
+        val request = OneTimeWorkRequestBuilder<WriteSyncWorker>()
+            .setConstraints(networkConstraint)
+            .build()
+        workManager.enqueueUniqueWork(
+            WRITE_PUSH_NAME,
+            // APPEND_OR_REPLACE so a queued push that hasn't started
+            // isn't redundantly enqueued, but a brand-new toggle while
+            // a push is mid-flight still gets a follow-up run.
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
+            request,
+        )
+    }
+
     fun schedulePeriodic() {
         val request = PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES)
             .setConstraints(networkConstraint)
@@ -47,11 +62,13 @@ class SyncScheduler @Inject constructor(
 
     fun cancelAll() {
         workManager.cancelUniqueWork(ONE_SHOT_NAME)
+        workManager.cancelUniqueWork(WRITE_PUSH_NAME)
         workManager.cancelUniqueWork(PERIODIC_NAME)
     }
 
     private companion object {
         const val ONE_SHOT_NAME = "rss_sync_oneshot"
+        const val WRITE_PUSH_NAME = "rss_write_push"
         const val PERIODIC_NAME = "rss_sync_periodic"
     }
 }

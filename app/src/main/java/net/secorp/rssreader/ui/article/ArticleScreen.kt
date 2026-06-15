@@ -59,7 +59,13 @@ fun ArticleScreen(
                     }
                 },
                 actions = {
-                    val link = item?.link
+                    val current = item
+                    if (current != null) {
+                        TextButton(onClick = { viewModel.toggleRead() }) {
+                            Text(if (current.isRead) "Mark unread" else "Mark read")
+                        }
+                    }
+                    val link = current?.link
                     if (!link.isNullOrBlank()) {
                         TextButton(onClick = {
                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))

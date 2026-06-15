@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 import net.secorp.rssreader.data.api.dto.CategoryDto
 import net.secorp.rssreader.data.api.dto.FeedDto
 import net.secorp.rssreader.data.api.dto.FeedItemDto
+import net.secorp.rssreader.data.api.dto.ReadStatusDto
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -41,7 +42,15 @@ interface RssApi {
         @Query("feedId") feedId: Long? = null,
         @Query("categoryId") categoryId: Long? = null,
         @Query("isRead") isRead: Boolean? = null,
+        @Query("since") since: String? = null,
     ): List<FeedItemDto>
+
+    @GET("api/read-status")
+    suspend fun listReadStatuses(
+        @Query("since") since: String? = null,
+        @Query("limit") limit: Int = 500,
+        @Query("offset") offset: Int = 0,
+    ): List<ReadStatusDto>
 
     @GET("api/feed-items/{id}")
     suspend fun getItem(@Path("id") id: Long): FeedItemDto

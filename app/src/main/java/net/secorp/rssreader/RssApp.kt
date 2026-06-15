@@ -38,12 +38,10 @@ class RssApp : Application(), Configuration.Provider, ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
-        // Periodic background sync is intentionally NOT scheduled in P2:
-        // a runaway sync caused a foldable touch-driver hang during testing,
-        // and until P3's delta sync lands (small, since=<cursor>-bounded
-        // refreshes) we want every sync to be user-initiated. Sync still
-        // runs once on successful sign-in via SyncScheduler.enqueueOneShot,
-        // and the Refresh button in FeedListScreen triggers it on demand.
-        syncScheduler.cancelAll()
+        // Re-enabled in P3: each periodic run now uses since=<lastSyncedAt>
+        // so the worker fetches a small delta, not the full item set.
+        // KEEP policy means an existing schedule from a prior install isn't
+        // reset every app launch.
+        syncScheduler.schedulePeriodic()
     }
 }

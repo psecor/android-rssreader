@@ -50,4 +50,7 @@ interface FeedItemDao {
 
     @Upsert
     suspend fun upsertAll(items: List<FeedItemEntity>)
+
+    @Query("UPDATE feed_items SET isRead = :isRead, readAt = :readAt WHERE id = :id")
+    suspend fun setRead(id: Long, isRead: Boolean, readAt: java.time.Instant?)
 }
