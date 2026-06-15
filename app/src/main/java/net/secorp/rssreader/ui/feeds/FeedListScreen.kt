@@ -1,5 +1,6 @@
 package net.secorp.rssreader.ui.feeds
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -124,13 +125,16 @@ fun FeedListScreen(
 
 @Composable
 private fun CategoryHeader(name: String) {
+    // Tonal background + uppercase label so the category band reads as a
+    // section divider, not just another row.
     Text(
-        text = name,
+        text = name.uppercase(),
         style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
     )
     HorizontalDivider()
 }

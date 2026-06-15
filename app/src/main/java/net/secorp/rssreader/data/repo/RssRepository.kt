@@ -151,6 +151,22 @@ class RssRepository @Inject constructor(
         syncScheduler.enqueueWritePush()
     }
 
+    /**
+     * Bulk variant for "mark all read" — single SQL UPDATE for the items,
+     * single Upsert batch for the pending actions, one write push. No-op on
+     * empty input.
+     */
+    suspend fun markRead(itemIds: List<Long>, isRead: Boolean) {
+        if (itemIds.isEmpty()) return
+        val now = Instant.now()
+        val readAt = if (isRead) now else null
+        feedItemDao.setReadMany(itemIds, isRead = isRead, readAt = readAt)
+        pendingActionDao.upsertAll(
+            itemIds.map { PendingActionEntity(itemId = it, isRead = isRead, queuedAt = now) }
+        )
+        syncScheduler.enqueueWritePush()
+    }
+
     companion object {
         /** Hard cap on the size of any single item list emitted to the UI. */
         const val DEFAULT_ITEM_LIMIT = 500

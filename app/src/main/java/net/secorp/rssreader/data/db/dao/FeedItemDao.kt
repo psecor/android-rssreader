@@ -64,4 +64,7 @@ interface FeedItemDao {
 
     @Query("UPDATE feed_items SET isRead = :isRead, readAt = :readAt WHERE id = :id")
     suspend fun setRead(id: Long, isRead: Boolean, readAt: java.time.Instant?)
+
+    @Query("UPDATE feed_items SET isRead = :isRead, readAt = :readAt WHERE id IN (:ids)")
+    suspend fun setReadMany(ids: List<Long>, isRead: Boolean, readAt: java.time.Instant?)
 }

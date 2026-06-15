@@ -108,6 +108,17 @@ class ItemListViewModel @Inject constructor(
         viewModelScope.launch { rssRepository.markRead(itemId, isRead = isRead) }
     }
 
+    /**
+     * Mark every unread item currently visible in [state] as read. Bounded
+     * by the DAO's LIMIT (DEFAULT_ITEM_LIMIT), so this is "mark the loaded
+     * window" rather than "mark every unread item ever".
+     */
+    fun markAllVisibleRead() {
+        val ids = state.value.items.filter { !it.isRead }.map { it.id }
+        if (ids.isEmpty()) return
+        viewModelScope.launch { rssRepository.markRead(ids, isRead = true) }
+    }
+
     fun openSearch() {
         _searchActive.value = true
     }

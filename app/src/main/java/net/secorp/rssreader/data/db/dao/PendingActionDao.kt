@@ -11,6 +11,9 @@ interface PendingActionDao {
     @Upsert
     suspend fun upsert(action: PendingActionEntity)
 
+    @Upsert
+    suspend fun upsertAll(actions: List<PendingActionEntity>)
+
     @Query("SELECT * FROM pending_actions ORDER BY queuedAt ASC")
     suspend fun all(): List<PendingActionEntity>
 

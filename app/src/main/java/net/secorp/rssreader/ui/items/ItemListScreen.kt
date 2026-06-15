@@ -33,6 +33,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -133,6 +134,9 @@ fun ItemListScreen(
                     } else {
                         IconButton(onClick = { viewModel.openSearch() }) {
                             Icon(Icons.Default.Search, contentDescription = "Search")
+                        }
+                        TextButton(onClick = { viewModel.markAllVisibleRead() }) {
+                            Text("Mark all read")
                         }
                         FilterChip(
                             selected = state.onlyUnread,
