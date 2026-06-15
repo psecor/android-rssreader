@@ -99,6 +99,14 @@ fun ArticleScreen(
                     )
                 }
             },
+            // WebViews retain process resources until destroy() is called.
+            // Without this, popping back from ArticleScreen leaves the
+            // WebView alive long enough to leak memory across many opens.
+            onRelease = { webView ->
+                webView.stopLoading()
+                webView.loadUrl("about:blank")
+                webView.destroy()
+            },
         )
     }
 }

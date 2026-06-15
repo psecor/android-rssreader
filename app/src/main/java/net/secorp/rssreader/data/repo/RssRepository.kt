@@ -29,8 +29,14 @@ class RssRepository @Inject constructor(
     fun observeFeedsByCategory(categoryId: Long): Flow<List<FeedEntity>> =
         feedDao.observeByCategory(categoryId)
 
-    fun observeItemsByFeed(feedId: Long): Flow<List<FeedItemEntity>> =
-        feedItemDao.observeByFeed(feedId)
+    fun observeItems(
+        feedId: Long?,
+        onlyUnread: Boolean,
+        limit: Int = DEFAULT_ITEM_LIMIT,
+    ): Flow<List<FeedItemEntity>> =
+        feedItemDao.observe(feedId = feedId, onlyUnread = onlyUnread, limit = limit)
+
+    fun observeTotalUnread(): Flow<Int> = feedItemDao.observeTotalUnread()
 
     fun observeItem(id: Long): Flow<FeedItemEntity?> = feedItemDao.observeById(id)
 
@@ -51,7 +57,7 @@ class RssRepository @Inject constructor(
      * pass would race with future write-queue mutations (P3). Cascade from
      * feed-replace handles items whose parent feed disappeared.
      */
-    suspend fun refreshItems(pageSize: Int = 200, maxItems: Int = 5000) {
+    suspend fun refreshItems(pageSize: Int = 200, maxItems: Int = DEFAULT_ITEM_LIMIT) {
         val collected = mutableListOf<FeedItemEntity>()
         var offset = 0
         while (collected.size < maxItems) {
@@ -76,5 +82,10 @@ class RssRepository @Inject constructor(
         refreshCategories()
         refreshFeeds()
         refreshItems()
+    }
+
+    companion object {
+        /** Hard cap on the size of any single item list emitted to the UI. */
+        const val DEFAULT_ITEM_LIMIT = 500
     }
 }
