@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Source: rssreader/frontend/public/favicon.svg
+  The original 256x256 RSS waves are scaled by 72/256 and offset by 18
+  on each axis so they sit inside the 72dp safe zone of the 108dp
+  adaptive-icon canvas. The background layer (#FF6600) handles the
+  outer area that any launcher mask might crop.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Dot at scaled (37.125, 71.15625) radius 6.75 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30.375,71.15625 a6.75,6.75 0 1 0 13.5,0 a6.75,6.75 0 1 0 -13.5,0 z" />
+
+    <!-- Outer arc: source M68,68 Q68,189 189,189 stroke 32 -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M37.125,37.125 Q37.125,71.15625 71.15625,71.15625" />
+
+    <!-- Inner arc: source M68,110 Q68,189 147,189 stroke 32 -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M37.125,48.9375 Q37.125,71.15625 59.34375,71.15625" />
+</vector>
