@@ -1,0 +1,21 @@
+# Copy to local.properties and fill in. local.properties is gitignored.
+
+# Path to the Android SDK. Android Studio writes this for you on first sync;
+# also accepted via the ANDROID_HOME / ANDROID_SDK_ROOT env vars.
+sdk.dir=/path/to/Android/sdk
+
+# Backend base URL for the rssreader server. Must end with a trailing slash.
+# Examples:
+#   production:           https://your-rssreader-host.example/rssreader/
+#   local dev, emulator:  http://10.0.2.2:3001/
+#   local dev, USB device: http://localhost:3001/
+#                         (with `adb reverse tcp:3001 tcp:3001` on the host)
+backendBaseUrl=
+
+# Google OAuth 2.0 *web* client ID. The Android ID token's `aud` claim must
+# match this value, and the backend verifies against it. Get one from the
+# Google Cloud Console: APIs & Services → Credentials → Create OAuth client ID
+# → Application type: Web. (The separate Android OAuth client, registered with
+# the app's package name + signing SHA-1, only authorizes the app to obtain
+# tokens — it does not appear here.)
+googleWebClientId=

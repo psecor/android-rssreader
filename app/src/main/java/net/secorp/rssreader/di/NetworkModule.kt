@@ -53,6 +53,9 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideRetrofit(client: OkHttpClient, json: Json): Retrofit {
+        check(BuildConfig.API_BASE_URL.isNotEmpty()) {
+            "API_BASE_URL is empty — set backendBaseUrl in local.properties"
+        }
         val contentType = "application/json".toMediaType()
         return Retrofit.Builder()
             .baseUrl(BuildConfig.API_BASE_URL)

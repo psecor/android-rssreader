@@ -14,6 +14,7 @@ val localProps = Properties().apply {
     if (f.exists()) f.inputStream().use { load(it) }
 }
 val googleWebClientId: String = localProps.getProperty("googleWebClientId", "")
+val backendBaseUrl: String = localProps.getProperty("backendBaseUrl", "")
 
 android {
     namespace = "net.secorp.rssreader"
@@ -28,17 +29,20 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "API_BASE_URL", "\"https://secorp.net/rssreader/\"")
+        // Backend host + OAuth client ID come from local.properties so the repo
+        // can stay portable / public. See local.properties.example for the
+        // schema. Empty values build successfully but fail at runtime with a
+        // clear message.
+        buildConfigField("String", "API_BASE_URL", "\"$backendBaseUrl\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
     }
 
     buildTypes {
         debug {
-            // Defaults to production for everyday on-device testing. For local
-            // backend dev, override here to "http://localhost:3001/" and run
-            // `adb reverse tcp:3001 tcp:3001` with the backend listening on 3001
-            // on the Mac.
-            buildConfigField("String", "API_BASE_URL", "\"https://secorp.net/rssreader/\"")
+            // For local backend dev, set backendBaseUrl in local.properties to
+            // either "http://10.0.2.2:3001/" (emulator → host) or
+            // "http://localhost:3001/" with `adb reverse tcp:3001 tcp:3001` for
+            // a USB-connected device.
             isDebuggable = true
         }
         release {
