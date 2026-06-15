@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
@@ -46,6 +47,7 @@ fun FeedListScreen(
     viewModel: FeedListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     var menuExpanded by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -78,31 +80,41 @@ fun FeedListScreen(
             )
         },
     ) { inner ->
-        if (state.groups.isEmpty() && state.uncategorized.isEmpty()) {
-            EmptyState(modifier = Modifier.padding(inner))
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(inner),
-                contentPadding = PaddingValues(vertical = 8.dp),
-            ) {
-                item(key = "all-items") {
-                    AllItemsRow(unreadCount = state.totalUnread, onClick = onAllItemsClick)
-                    HorizontalDivider()
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.refresh() },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(inner),
+        ) {
+            if (state.groups.isEmpty() && state.uncategorized.isEmpty()) {
+                // LazyColumn so PullToRefreshBox still gets a scrollable child
+                // to attach its nested-scroll listener to when the list is empty.
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    item { EmptyState(modifier = Modifier.fillParentMaxSize()) }
                 }
-                state.groups.forEach { group ->
-                    item(key = "cat-${group.category.id}") {
-                        CategoryHeader(name = group.category.name)
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(vertical = 8.dp),
+                ) {
+                    item(key = "all-items") {
+                        AllItemsRow(unreadCount = state.totalUnread, onClick = onAllItemsClick)
+                        HorizontalDivider()
                     }
-                    items(items = group.feeds, key = { "feed-${it.id}" }) { feed ->
-                        FeedRow(feed = feed, onClick = { onFeedClick(feed.id) })
+                    state.groups.forEach { group ->
+                        item(key = "cat-${group.category.id}") {
+                            CategoryHeader(name = group.category.name)
+                        }
+                        items(items = group.feeds, key = { "feed-${it.id}" }) { feed ->
+                            FeedRow(feed = feed, onClick = { onFeedClick(feed.id) })
+                        }
                     }
-                }
-                if (state.uncategorized.isNotEmpty()) {
-                    item(key = "cat-uncat") { CategoryHeader(name = "Uncategorized") }
-                    items(items = state.uncategorized, key = { "feed-${it.id}" }) { feed ->
-                        FeedRow(feed = feed, onClick = { onFeedClick(feed.id) })
+                    if (state.uncategorized.isNotEmpty()) {
+                        item(key = "cat-uncat") { CategoryHeader(name = "Uncategorized") }
+                        items(items = state.uncategorized, key = { "feed-${it.id}" }) { feed ->
+                            FeedRow(feed = feed, onClick = { onFeedClick(feed.id) })
+                        }
                     }
                 }
             }

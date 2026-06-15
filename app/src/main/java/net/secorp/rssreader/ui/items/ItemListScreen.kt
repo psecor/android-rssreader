@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -52,6 +53,7 @@ fun ItemListScreen(
     viewModel: ItemListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     Scaffold(
         topBar = {
             TopAppBar(
@@ -75,15 +77,21 @@ fun ItemListScreen(
             )
         },
     ) { inner ->
-        LazyColumn(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.refresh() },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(inner),
-            contentPadding = PaddingValues(vertical = 4.dp),
         ) {
-            items(items = state.items, key = { it.id }) { item ->
-                ItemRow(item = item, onClick = { onItemClick(item.id) })
-                HorizontalDivider()
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(vertical = 4.dp),
+            ) {
+                items(items = state.items, key = { it.id }) { item ->
+                    ItemRow(item = item, onClick = { onItemClick(item.id) })
+                    HorizontalDivider()
+                }
             }
         }
     }

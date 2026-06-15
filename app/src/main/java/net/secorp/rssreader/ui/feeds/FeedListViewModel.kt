@@ -54,6 +54,13 @@ class FeedListViewModel @Inject constructor(
         initialValue = FeedListUiState(),
     )
 
+    val isRefreshing: StateFlow<Boolean> = syncScheduler.isReadSyncRunning
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = false,
+        )
+
     fun refresh() = syncScheduler.enqueueOneShot()
 
     fun signOut() = authRepository.signOut()

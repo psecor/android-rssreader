@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.stateIn
 import net.secorp.rssreader.data.db.entity.FeedEntity
 import net.secorp.rssreader.data.db.entity.FeedItemEntity
 import net.secorp.rssreader.data.repo.RssRepository
+import net.secorp.rssreader.data.sync.SyncScheduler
 
 data class ItemListUiState(
     val title: String = "Items",
@@ -28,6 +29,7 @@ data class ItemListUiState(
 class ItemListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     rssRepository: RssRepository,
+    private val syncScheduler: SyncScheduler,
 ) : ViewModel() {
 
     /** feedId is null when this VM is hosting the "All items" destination. */
@@ -57,6 +59,13 @@ class ItemListViewModel @Inject constructor(
             initialValue = ItemListUiState(title = if (feedId == null) "All items" else "Items"),
         )
 
+    val isRefreshing: StateFlow<Boolean> = syncScheduler.isReadSyncRunning
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = false,
+        )
+
     private fun feedTitle(feeds: List<FeedEntity>): String =
         if (feedId == null) "All items"
         else feeds.firstOrNull { it.id == feedId }?.title ?: "Items"
@@ -64,4 +73,6 @@ class ItemListViewModel @Inject constructor(
     fun toggleUnreadOnly() {
         _onlyUnread.value = !_onlyUnread.value
     }
+
+    fun refresh() = syncScheduler.enqueueOneShot()
 }

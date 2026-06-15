@@ -12,6 +12,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 @Singleton
 class SyncScheduler @Inject constructor(
@@ -22,6 +25,16 @@ class SyncScheduler @Inject constructor(
     private val networkConstraint = Constraints.Builder()
         .setRequiredNetworkType(NetworkType.CONNECTED)
         .build()
+
+    /**
+     * True while the one-shot read sync is enqueued or running. Drives the
+     * pull-to-refresh spinner so it clears even if the user backgrounds the
+     * app mid-sync and returns.
+     */
+    val isReadSyncRunning: Flow<Boolean> =
+        workManager.getWorkInfosForUniqueWorkFlow(ONE_SHOT_NAME)
+            .map { infos -> infos.any { !it.state.isFinished } }
+            .distinctUntilChanged()
 
     fun enqueueOneShot() {
         val request = OneTimeWorkRequestBuilder<SyncWorker>()
