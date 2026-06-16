@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -52,13 +53,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -82,11 +87,11 @@ fun ItemListScreen(
     val searchFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
-    // Jump to the top of the list whenever the page changes so the user
-    // doesn't land mid-scroll on a fresh page. Doesn't fire on filter changes
-    // because filter changes also reset pageIndex to 0 in the VM, which lands
-    // on this same effect.
-    LaunchedEffect(state.pageIndex) {
+    val scrollResetTick by viewModel.scrollResetTick.collectAsState()
+    // Jump to the top of the list whenever the page changes or the VM signals
+    // a scroll reset (e.g. after mark-all-read, where the page index didn't
+    // change but the visible items got swapped under us).
+    LaunchedEffect(state.pageIndex, scrollResetTick) {
         listState.scrollToItem(0)
     }
     // Local source-of-truth for the TextField. Binding the field directly to
@@ -187,7 +192,12 @@ fun ItemListScreen(
         ) {
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .simpleScrollbar(
+                        state = listState,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                    ),
                 contentPadding = PaddingValues(vertical = 4.dp),
             ) {
                 items(items = state.items, key = { it.id }) { item ->
@@ -418,6 +428,41 @@ private fun ItemRow(
             }
         }
     }
+}
+
+/**
+ * Lightweight always-visible scrollbar drawn on the right edge of a
+ * LazyColumn. Position is index-based (treats every row as equal height),
+ * which is a fine approximation for our ~50-item pages even though item
+ * heights vary with description + thumbnail presence.
+ */
+private fun Modifier.simpleScrollbar(
+    state: LazyListState,
+    color: Color,
+    width: Dp = 4.dp,
+    minThumbHeightPx: Float = 24f,
+): Modifier = drawWithContent {
+    drawContent()
+    val total = state.layoutInfo.totalItemsCount
+    if (total == 0) return@drawWithContent
+    val visible = state.layoutInfo.visibleItemsInfo
+    if (visible.isEmpty()) return@drawWithContent
+
+    val firstIdx = visible.first().index
+    val lastIdx = visible.last().index
+    val startFraction = firstIdx.toFloat() / total
+    val endFraction = ((lastIdx + 1).toFloat() / total).coerceAtMost(1f)
+
+    val barHeight = size.height
+    val top = startFraction * barHeight
+    val thumbHeight = ((endFraction - startFraction) * barHeight).coerceAtLeast(minThumbHeightPx)
+    val barWidthPx = width.toPx()
+
+    drawRect(
+        color = color,
+        topLeft = Offset(size.width - barWidthPx - 2f, top),
+        size = Size(barWidthPx, thumbHeight),
+    )
 }
 
 private fun relativeTime(instant: Instant): String {

@@ -63,6 +63,15 @@ class ItemListViewModel @Inject constructor(
     private val _query = MutableStateFlow("")
     private val _pageIndex = MutableStateFlow(0)
 
+    /**
+     * Monotonic counter the screen observes to know when to reset the
+     * LazyColumn scroll position. Bumped on user actions that swap the
+     * visible items underneath the same pageIndex (e.g. mark-all-read),
+     * where the existing pageIndex-based scroll-to-top doesn't fire.
+     */
+    private val _scrollResetTick = MutableStateFlow(0)
+    val scrollResetTick: StateFlow<Int> = _scrollResetTick.asStateFlow()
+
     private val feedFlow = rssRepository.observeFeeds()
 
     private val filterInputs = combine(
@@ -178,6 +187,7 @@ class ItemListViewModel @Inject constructor(
         val ids = state.value.items.filter { !it.isRead }.map { it.id }
         if (ids.isEmpty()) return
         viewModelScope.launch { rssRepository.markRead(ids, isRead = true) }
+        _scrollResetTick.value = _scrollResetTick.value + 1
     }
 
     fun openSearch() {
