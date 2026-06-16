@@ -2,9 +2,11 @@
 project: android-rssreader
 status: in-progress
 status_description: "V1 daily-use scope feature-complete in debug builds; no release pipeline yet."
-last_updated: 2026-06-15
+last_updated: 2026-06-16
 last_updated_by: []
 wiki_schema_version: 1
+last_updated_by:
+  - agent:sweeper-claude-opus-4-7
 ---
 
 # AGENTS.md — android-rssreader
@@ -20,6 +22,7 @@ Native Android client for the self-hosted [rssreader](https://github.com/psecor/
 - ✅ Article reading (HTML render in WebView), mark-on-open
 - ✅ Mark read/unread: article toggle, row swipe, bulk "mark all read"
 - ✅ Local search across title/description/author
+- ✅ 50-per-page pagination on item lists (incremental load on scroll)
 - ✅ Pull-to-refresh; periodic WorkManager sync; post-sign-in sync
 - ✅ Delta sync (`since=` cursors), offline write queue with retry
 - ❌ Feed CRUD, category management, history view, reading stats (out of v1)

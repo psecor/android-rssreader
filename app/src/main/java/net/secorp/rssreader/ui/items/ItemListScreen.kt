@@ -193,6 +193,7 @@ fun ItemListScreen(
                 items(items = state.items, key = { it.id }) { item ->
                     SwipeableItemRow(
                         item = item,
+                        feedTitle = if (state.showSource) state.feedTitles[item.feedId] else null,
                         onClick = { onItemClick(item.id) },
                         onToggleRead = { viewModel.setRead(item.id, !item.isRead) },
                     )
@@ -281,6 +282,7 @@ private fun SearchField(
 @Composable
 private fun SwipeableItemRow(
     item: FeedItemEntity,
+    feedTitle: String?,
     onClick: () -> Unit,
     onToggleRead: () -> Unit,
 ) {
@@ -321,12 +323,16 @@ private fun SwipeableItemRow(
             }
         },
     ) {
-        ItemRow(item = item, onClick = onClick)
+        ItemRow(item = item, feedTitle = feedTitle, onClick = onClick)
     }
 }
 
 @Composable
-private fun ItemRow(item: FeedItemEntity, onClick: () -> Unit) {
+private fun ItemRow(
+    item: FeedItemEntity,
+    feedTitle: String?,
+    onClick: () -> Unit,
+) {
     val titleColor =
         if (item.isRead) MaterialTheme.colorScheme.onSurfaceVariant
         else MaterialTheme.colorScheme.onSurface
@@ -358,17 +364,25 @@ private fun ItemRow(item: FeedItemEntity, onClick: () -> Unit) {
                 )
             }
         }
-        if (!item.thumbnail.isNullOrBlank()) {
-            AsyncImage(
-                model = item.thumbnail,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .padding(end = 12.dp)
-                    .size(64.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .alpha(thumbnailAlpha),
-            )
+        // Thumbnail slot always reserves the same 64dp square so rows with
+        // and without artwork share a baseline. A surfaceVariant placeholder
+        // stands in when the item has no thumbnail.
+        Box(
+            modifier = Modifier
+                .padding(end = 12.dp)
+                .size(64.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .alpha(thumbnailAlpha),
+        ) {
+            if (!item.thumbnail.isNullOrBlank()) {
+                AsyncImage(
+                    model = item.thumbnail,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -390,6 +404,7 @@ private fun ItemRow(item: FeedItemEntity, onClick: () -> Unit) {
                 )
             }
             val sub = listOfNotNull(
+                feedTitle?.takeIf { it.isNotBlank() },
                 item.author?.takeIf { it.isNotBlank() },
                 item.pubDate?.let { relativeTime(it) },
             ).joinToString(" · ")

@@ -23,6 +23,13 @@ import net.secorp.rssreader.data.sync.SyncScheduler
 data class ItemListUiState(
     val title: String = "Items",
     val items: List<FeedItemEntity> = emptyList(),
+    val feedTitles: Map<Long, String> = emptyMap(),
+    /**
+     * True when this VM is rendering the cross-feed "All items" list, so the
+     * row should attribute each item to its source feed. On per-feed lists
+     * the title bar already names the feed.
+     */
+    val showSource: Boolean = false,
     val onlyUnread: Boolean = false,
     val searchActive: Boolean = false,
     val query: String = "",
@@ -112,6 +119,8 @@ class ItemListViewModel @Inject constructor(
                 ItemListUiState(
                     title = title,
                     items = items,
+                    feedTitles = inputs.feeds.associate { it.id to it.title },
+                    showSource = feedId == null,
                     onlyUnread = inputs.onlyUnread,
                     searchActive = inputs.searchActive,
                     query = inputs.query,
