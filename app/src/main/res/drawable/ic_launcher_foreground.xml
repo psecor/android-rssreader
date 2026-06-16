@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Source: rssreader/frontend/public/favicon.svg
-  The original 256x256 RSS waves are scaled by 72/256 and offset by 18
-  on each axis so they sit inside the 72dp safe zone of the 108dp
-  adaptive-icon canvas. The background layer (#FF6600) handles the
-  outer area that any launcher mask might crop.
+  The 256x256 RSS waves are scaled by 72/256 and offset by 18 on each
+  axis so they sit inside the 72dp safe zone of the 108dp adaptive-icon
+  canvas. The background layer (#FF6600) handles the outer area that
+  any launcher mask might crop.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -12,22 +12,24 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Dot at scaled (37.125, 71.15625) radius 6.75 -->
+    <!-- Dot: source cx=68 cy=188 r=20 → 37.125, 70.875, r=5.625 -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M30.375,71.15625 a6.75,6.75 0 1 0 13.5,0 a6.75,6.75 0 1 0 -13.5,0 z" />
+        android:pathData="M31.5,70.875 a5.625,5.625 0 1 0 11.25,0 a5.625,5.625 0 1 0 -11.25,0 z" />
 
-    <!-- Outer arc: source M68,68 Q68,189 189,189 stroke 32 -->
+    <!-- Outer arc: source M68,68 A120,120 0 0 1 188,188 stroke 32, round caps -->
     <path
         android:strokeColor="#FFFFFF"
         android:strokeWidth="9"
+        android:strokeLineCap="round"
         android:fillColor="@android:color/transparent"
-        android:pathData="M37.125,37.125 Q37.125,71.15625 71.15625,71.15625" />
+        android:pathData="M37.125,37.125 A33.75,33.75 0 0 1 70.875,70.875" />
 
-    <!-- Inner arc: source M68,110 Q68,189 147,189 stroke 32 -->
+    <!-- Inner arc: source M68,132 A56,56 0 0 1 124,188 stroke 32, round caps -->
     <path
         android:strokeColor="#FFFFFF"
         android:strokeWidth="9"
+        android:strokeLineCap="round"
         android:fillColor="@android:color/transparent"
-        android:pathData="M37.125,48.9375 Q37.125,71.15625 59.34375,71.15625" />
+        android:pathData="M37.125,55.125 A15.75,15.75 0 0 1 52.875,70.875" />
 </vector>
