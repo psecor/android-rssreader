@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.activity.compose.BackHandler
@@ -20,6 +21,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -30,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
@@ -58,6 +61,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -77,6 +81,14 @@ fun ItemListScreen(
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val searchFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val listState = rememberLazyListState()
+    // Jump to the top of the list whenever the page changes so the user
+    // doesn't land mid-scroll on a fresh page. Doesn't fire on filter changes
+    // because filter changes also reset pageIndex to 0 in the VM, which lands
+    // on this same effect.
+    LaunchedEffect(state.pageIndex) {
+        listState.scrollToItem(0)
+    }
     // Local source-of-truth for the TextField. Binding the field directly to
     // a StateFlow round-trips every keystroke through the VM and back, which
     // lags one frame and causes dropped/garbled input on fast typing. The
@@ -151,6 +163,20 @@ fun ItemListScreen(
                 },
             )
         },
+        bottomBar = {
+            if (state.totalCount > 0) {
+                PaginationBar(
+                    pageIndex = state.pageIndex,
+                    pageSize = state.pageSize,
+                    totalCount = state.totalCount,
+                    onlyUnread = state.onlyUnread,
+                    canPrev = state.canPrev,
+                    canNext = state.canNext,
+                    onPrev = { viewModel.prevPage() },
+                    onNext = { viewModel.nextPage() },
+                )
+            }
+        },
     ) { inner ->
         PullToRefreshBox(
             isRefreshing = isRefreshing,
@@ -160,6 +186,7 @@ fun ItemListScreen(
                 .padding(inner),
         ) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(vertical = 4.dp),
             ) {
@@ -171,6 +198,49 @@ fun ItemListScreen(
                     )
                     HorizontalDivider()
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PaginationBar(
+    pageIndex: Int,
+    pageSize: Int,
+    totalCount: Int,
+    onlyUnread: Boolean,
+    canPrev: Boolean,
+    canNext: Boolean,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+) {
+    val from = pageIndex * pageSize + 1
+    val to = minOf((pageIndex + 1) * pageSize, totalCount)
+    val unit = if (onlyUnread) " unread" else ""
+    Surface(tonalElevation = 3.dp) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onPrev, enabled = canPrev) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Previous page",
+                )
+            }
+            Text(
+                text = "$from–$to of $totalCount$unit",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onNext, enabled = canNext) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = "Next page",
+                )
             }
         }
     }

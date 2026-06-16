@@ -26,7 +26,17 @@ data class ItemListUiState(
     val onlyUnread: Boolean = false,
     val searchActive: Boolean = false,
     val query: String = "",
-)
+    val pageIndex: Int = 0,
+    val pageSize: Int = PAGE_SIZE,
+    val totalCount: Int = 0,
+) {
+    val totalPages: Int get() =
+        if (totalCount == 0) 0 else (totalCount - 1) / pageSize + 1
+    val canPrev: Boolean get() = pageIndex > 0
+    val canNext: Boolean get() = pageIndex < totalPages - 1
+}
+
+private const val PAGE_SIZE = 50
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -44,10 +54,11 @@ class ItemListViewModel @Inject constructor(
 
     private val _searchActive = MutableStateFlow(false)
     private val _query = MutableStateFlow("")
+    private val _pageIndex = MutableStateFlow(0)
 
     private val feedFlow = rssRepository.observeFeeds()
 
-    val state: StateFlow<ItemListUiState> = combine(
+    private val filterInputs = combine(
         feedFlow,
         _onlyUnread,
         _searchActive,
@@ -55,15 +66,48 @@ class ItemListViewModel @Inject constructor(
     ) { feeds, unread, searchActive, query ->
         FilterInputs(feeds = feeds, onlyUnread = unread, searchActive = searchActive, query = query)
     }
+
+    private val totalCount: StateFlow<Int> = filterInputs
         .flatMapLatest { inputs ->
-            val title = feedTitle(inputs.feeds)
-            // Empty query when search bar is closed; the DAO collapses an
-            // empty query to a "%" no-op LIKE.
-            val effectiveQuery = if (inputs.searchActive) inputs.query else ""
-            rssRepository.observeItems(
+            rssRepository.observeItemsCount(
                 feedId = feedId,
                 onlyUnread = inputs.onlyUnread,
-                query = effectiveQuery,
+                query = effectiveQuery(inputs),
+            )
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = 0,
+        )
+
+    init {
+        // If a mark-all-read or sync shrinks the result set so that the
+        // current page would be empty, clamp to the last valid page.
+        // Filter changes already reset pageIndex to 0 via the setters.
+        viewModelScope.launch {
+            totalCount.collect { count ->
+                val maxIndex = if (count == 0) 0 else (count - 1) / PAGE_SIZE
+                if (_pageIndex.value > maxIndex) _pageIndex.value = maxIndex
+            }
+        }
+    }
+
+    val state: StateFlow<ItemListUiState> = combine(
+        filterInputs,
+        _pageIndex,
+        totalCount,
+    ) { inputs, pageIndex, count ->
+        Triple(inputs, pageIndex, count)
+    }
+        .flatMapLatest { (inputs, pageIndex, count) ->
+            val title = feedTitle(inputs.feeds)
+            rssRepository.observeItemsPage(
+                feedId = feedId,
+                onlyUnread = inputs.onlyUnread,
+                query = effectiveQuery(inputs),
+                pageSize = PAGE_SIZE,
+                pageIndex = pageIndex,
             ).map { items ->
                 ItemListUiState(
                     title = title,
@@ -71,13 +115,25 @@ class ItemListViewModel @Inject constructor(
                     onlyUnread = inputs.onlyUnread,
                     searchActive = inputs.searchActive,
                     query = inputs.query,
+                    pageIndex = pageIndex,
+                    pageSize = PAGE_SIZE,
+                    totalCount = count,
                 )
             }
         }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = ItemListUiState(title = if (feedId == null) "All items" else "Items"),
+            initialValue = ItemListUiState(
+                title = if (feedId == null) "All items" else "Items",
+            ),
+        )
+
+    val isRefreshing: StateFlow<Boolean> = syncScheduler.isReadSyncRunning
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = false,
         )
 
     private data class FilterInputs(
@@ -87,12 +143,8 @@ class ItemListViewModel @Inject constructor(
         val query: String,
     )
 
-    val isRefreshing: StateFlow<Boolean> = syncScheduler.isReadSyncRunning
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = false,
-        )
+    private fun effectiveQuery(inputs: FilterInputs): String =
+        if (inputs.searchActive) inputs.query else ""
 
     private fun feedTitle(feeds: List<FeedEntity>): String =
         if (feedId == null) "All items"
@@ -100,6 +152,7 @@ class ItemListViewModel @Inject constructor(
 
     fun toggleUnreadOnly() {
         _onlyUnread.value = !_onlyUnread.value
+        _pageIndex.value = 0
     }
 
     fun refresh() = syncScheduler.enqueueOneShot()
@@ -109,9 +162,8 @@ class ItemListViewModel @Inject constructor(
     }
 
     /**
-     * Mark every unread item currently visible in [state] as read. Bounded
-     * by the DAO's LIMIT (DEFAULT_ITEM_LIMIT), so this is "mark the loaded
-     * window" rather than "mark every unread item ever".
+     * Mark every unread item on the current page as read. The page bounds the
+     * action, matching the web app's "mark this page read" semantics.
      */
     fun markAllVisibleRead() {
         val ids = state.value.items.filter { !it.isRead }.map { it.id }
@@ -121,14 +173,25 @@ class ItemListViewModel @Inject constructor(
 
     fun openSearch() {
         _searchActive.value = true
+        _pageIndex.value = 0
     }
 
     fun closeSearch() {
         _searchActive.value = false
         _query.value = ""
+        _pageIndex.value = 0
     }
 
     fun setQuery(value: String) {
         _query.value = value
+        _pageIndex.value = 0
+    }
+
+    fun nextPage() {
+        if (state.value.canNext) _pageIndex.value = _pageIndex.value + 1
+    }
+
+    fun prevPage() {
+        if (state.value.canPrev) _pageIndex.value = _pageIndex.value - 1
     }
 }

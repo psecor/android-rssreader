@@ -37,22 +37,37 @@ class RssRepository @Inject constructor(
     fun observeFeedsByCategory(categoryId: Long): Flow<List<FeedEntity>> =
         feedDao.observeByCategory(categoryId)
 
-    fun observeItems(
+    fun observeItemsPage(
         feedId: Long?,
         onlyUnread: Boolean,
         query: String = "",
-        limit: Int = DEFAULT_ITEM_LIMIT,
-    ): Flow<List<FeedItemEntity>> {
-        // Empty query → "%" which matches every row, so the LIKE collapses to
-        // a no-op. Keeping the LIKE always-on avoids two DAO methods.
-        val pattern = if (query.isBlank()) "%" else "%${query.trim()}%"
-        return feedItemDao.observe(
+        pageSize: Int,
+        pageIndex: Int,
+    ): Flow<List<FeedItemEntity>> =
+        feedItemDao.observePage(
             feedId = feedId,
             onlyUnread = onlyUnread,
-            searchPattern = pattern,
-            limit = limit,
+            searchPattern = toLikePattern(query),
+            limit = pageSize,
+            offset = pageIndex * pageSize,
         )
-    }
+
+    fun observeItemsCount(
+        feedId: Long?,
+        onlyUnread: Boolean,
+        query: String = "",
+    ): Flow<Int> =
+        feedItemDao.observeCount(
+            feedId = feedId,
+            onlyUnread = onlyUnread,
+            searchPattern = toLikePattern(query),
+        )
+
+    // Empty query → "%" which matches every row, so the LIKE collapses to
+    // a no-op. Keeping the LIKE always-on lets one DAO query serve both
+    // filtered and unfiltered fetches.
+    private fun toLikePattern(query: String): String =
+        if (query.isBlank()) "%" else "%${query.trim()}%"
 
     fun observeTotalUnread(): Flow<Int> = feedItemDao.observeTotalUnread()
 
@@ -76,7 +91,7 @@ class RssRepository @Inject constructor(
      */
     suspend fun refreshItems(
         pageSize: Int = 200,
-        maxItems: Int = DEFAULT_ITEM_LIMIT,
+        maxItems: Int = MAX_ITEMS_PER_SYNC,
         since: Instant? = null,
     ) {
         val collected = mutableListOf<FeedItemEntity>()
@@ -167,8 +182,10 @@ class RssRepository @Inject constructor(
         syncScheduler.enqueueWritePush()
     }
 
-    companion object {
-        /** Hard cap on the size of any single item list emitted to the UI. */
-        const val DEFAULT_ITEM_LIMIT = 500
+    private companion object {
+        // Soft ceiling on how many items refreshItems pulls in one go. Keeps
+        // a clean install from trying to ingest the entire user history on
+        // the first sync. Independent of UI page size.
+        const val MAX_ITEMS_PER_SYNC = 500
     }
 }
