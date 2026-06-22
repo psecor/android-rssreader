@@ -200,14 +200,29 @@ fun ItemListScreen(
                     ),
                 contentPadding = PaddingValues(vertical = 4.dp),
             ) {
-                items(items = state.items, key = { it.id }) { item ->
-                    SwipeableItemRow(
-                        item = item,
-                        feedTitle = if (state.showSource) state.feedTitles[item.feedId] else null,
-                        onClick = { onItemClick(item.id) },
-                        onToggleRead = { viewModel.setRead(item.id, !item.isRead) },
-                    )
-                    HorizontalDivider()
+                if (state.items.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillParentMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = "No new items",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                } else {
+                    items(items = state.items, key = { it.id }) { item ->
+                        SwipeableItemRow(
+                            item = item,
+                            feedTitle = if (state.showSource) state.feedTitles[item.feedId] else null,
+                            onClick = { onItemClick(item.id) },
+                            onToggleRead = { viewModel.setRead(item.id, !item.isRead) },
+                        )
+                        HorizontalDivider()
+                    }
                 }
             }
         }

@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import net.secorp.rssreader.data.db.entity.FeedEntity
 import net.secorp.rssreader.data.db.entity.FeedItemEntity
+import net.secorp.rssreader.data.prefs.UiPreferencesStore
 import net.secorp.rssreader.data.repo.RssRepository
 import net.secorp.rssreader.data.sync.SyncScheduler
 
@@ -51,12 +52,13 @@ class ItemListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val rssRepository: RssRepository,
     private val syncScheduler: SyncScheduler,
+    private val uiPreferences: UiPreferencesStore,
 ) : ViewModel() {
 
     /** feedId is null when this VM is hosting the "All items" destination. */
     private val feedId: Long? = savedStateHandle.get<Long>("feedId")
 
-    private val _onlyUnread = MutableStateFlow(false)
+    private val _onlyUnread = MutableStateFlow(uiPreferences.onlyUnread)
     val onlyUnread: StateFlow<Boolean> = _onlyUnread.asStateFlow()
 
     private val _searchActive = MutableStateFlow(false)
@@ -169,7 +171,9 @@ class ItemListViewModel @Inject constructor(
         else feeds.firstOrNull { it.id == feedId }?.title ?: "Items"
 
     fun toggleUnreadOnly() {
-        _onlyUnread.value = !_onlyUnread.value
+        val newValue = !_onlyUnread.value
+        _onlyUnread.value = newValue
+        uiPreferences.onlyUnread = newValue
         _pageIndex.value = 0
     }
 
