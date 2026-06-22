@@ -2,11 +2,11 @@
 project: android-rssreader
 status: in-progress
 status_description: "V1 daily-use scope feature-complete in debug builds; no release pipeline yet."
-last_updated: 2026-06-16
-last_updated_by: []
-wiki_schema_version: 1
+last_updated: 2026-06-22
 last_updated_by:
   - agent:sweeper-claude-opus-4-7
+  - agent:claude-opus-4-7
+wiki_schema_version: 1
 ---
 
 # AGENTS.md — android-rssreader
@@ -43,6 +43,7 @@ app/src/main/java/net/secorp/rssreader/
 ├── data/
 │   ├── api/                        Retrofit interfaces + DTOs + mappers
 │   ├── db/                         Room entities, DAOs, migrations
+│   ├── prefs/UiPreferencesStore.kt SharedPreferences for sticky UI toggles
 │   ├── repo/RssRepository.kt       Sole source of truth surfaced to the UI
 │   └── sync/                       SyncScheduler + SyncWorker + WriteSyncWorker
 ├── di/                             Hilt modules
@@ -108,6 +109,7 @@ No release pipeline yet. `release` build type currently has `isMinifyEnabled = f
 - HTTP request/response logged at `BODY` level in debug via OkHttp `HttpLoggingInterceptor`. Filter logcat by tag `OkHttp`.
 - WorkManager state via `adb shell dumpsys jobscheduler | grep rssreader` or Android Studio's Background Task Inspector.
 - Last delta-sync watermark: `adb shell run-as net.secorp.rssreader cat shared_prefs/sync_state.xml`.
+- Sticky UI toggles (e.g. Unread filter): `adb shell run-as net.secorp.rssreader cat shared_prefs/ui_prefs.xml`.
 - Pending write queue depth: query the `pending_actions` table via Database Inspector, or call `PendingActionDao.count()` from a test scope.
 
 ## Integration Surfaces
