@@ -3,8 +3,11 @@ package net.secorp.rssreader.ui.article
 import android.content.Intent
 import android.net.Uri
 import android.view.ViewGroup
+import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -47,10 +50,16 @@ fun ArticleScreen(
         topBar = {
             TopAppBar(
                 title = {
+                    val link = item?.link
                     Text(
                         text = item?.title ?: "Article",
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = if (!link.isNullOrBlank()) {
+                            Modifier.clickable {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
+                            }
+                        } else Modifier,
                     )
                 },
                 navigationIcon = {
@@ -92,6 +101,23 @@ fun ArticleScreen(
                     settings.loadsImagesAutomatically = true
                     settings.cacheMode = WebSettings.LOAD_DEFAULT
                     setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    // Route in-content link taps (and the wrapped H1 anchor)
+                    // to the system browser instead of loading them inside
+                    // this WebView, which would strand the user with no way
+                    // back to the article.
+                    webViewClient = object : WebViewClient() {
+                        override fun shouldOverrideUrlLoading(
+                            view: WebView,
+                            request: WebResourceRequest,
+                        ): Boolean {
+                            val scheme = request.url.scheme
+                            if (scheme == "http" || scheme == "https") {
+                                ctx.startActivity(Intent(Intent.ACTION_VIEW, request.url))
+                                return true
+                            }
+                            return false
+                        }
+                    }
                 }
             },
             update = { webView ->
@@ -133,6 +159,12 @@ private fun buildHtml(
     // and we don't want to render it twice.
     val hero = item.thumbnail?.takeIf { it.isNotBlank() && !body.contains(it) }
     val heroImg = hero?.let { """<img class="hero" src="${escape(it)}" alt=""/>""" } ?: ""
+    val link = item.link?.takeIf { it.isNotBlank() }
+    val titleHtml = if (link != null) {
+        """<a class="title-link" href="${escape(link)}"><h1>${escape(item.title)}</h1></a>"""
+    } else {
+        """<h1>${escape(item.title)}</h1>"""
+    }
     return """
         <!DOCTYPE html>
         <html><head><meta charset="utf-8"/>
@@ -146,6 +178,7 @@ private fun buildHtml(
           .meta { color: $mutedHex; font-size: 0.9em; margin-bottom: 16px; }
           .hero { display: block; width: 100%; height: auto;
                   border-radius: 8px; margin-bottom: 16px; }
+          .title-link { color: inherit; text-decoration: none; display: block; }
           a { color: $linkHex; }
           img, video, iframe { max-width: 100%; height: auto; }
           pre, code { background: rgba(127,127,127,0.12);
@@ -156,7 +189,7 @@ private fun buildHtml(
                        margin: 0; padding: 0 12px; color: $mutedHex; }
         </style></head><body>
         $heroImg
-        <h1>${escape(item.title)}</h1>
+        $titleHtml
         <div class="meta">${author?.let { escape(it) + " · " } ?: ""}${item.pubDate ?: ""}</div>
         $body
         </body></html>
