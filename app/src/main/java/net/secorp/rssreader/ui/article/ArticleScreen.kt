@@ -128,6 +128,11 @@ private fun buildHtml(
 ): String {
     val body = item.contentHtml ?: item.description ?: ""
     val author = item.author?.takeIf { it.isNotBlank() }
+    // Skip the hero if the same URL is already embedded in the body — many
+    // WordPress-style feeds put the featured image at the top of contentHtml,
+    // and we don't want to render it twice.
+    val hero = item.thumbnail?.takeIf { it.isNotBlank() && !body.contains(it) }
+    val heroImg = hero?.let { """<img class="hero" src="${escape(it)}" alt=""/>""" } ?: ""
     return """
         <!DOCTYPE html>
         <html><head><meta charset="utf-8"/>
@@ -139,6 +144,8 @@ private fun buildHtml(
                  margin: 0; padding: 16px; }
           h1 { font-size: 1.4em; margin: 0 0 8px 0; }
           .meta { color: $mutedHex; font-size: 0.9em; margin-bottom: 16px; }
+          .hero { display: block; width: 100%; height: auto;
+                  border-radius: 8px; margin-bottom: 16px; }
           a { color: $linkHex; }
           img, video, iframe { max-width: 100%; height: auto; }
           pre, code { background: rgba(127,127,127,0.12);
@@ -148,6 +155,7 @@ private fun buildHtml(
           blockquote { border-left: 3px solid $mutedHex;
                        margin: 0; padding: 0 12px; color: $mutedHex; }
         </style></head><body>
+        $heroImg
         <h1>${escape(item.title)}</h1>
         <div class="meta">${author?.let { escape(it) + " · " } ?: ""}${item.pubDate ?: ""}</div>
         $body
