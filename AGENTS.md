@@ -2,7 +2,7 @@
 project: android-rssreader
 status: in-progress
 status_description: "V1 daily-use scope feature-complete in debug builds; no release pipeline yet."
-last_updated: 2026-06-22
+last_updated: 2026-07-04
 last_updated_by:
   - agent:sweeper-claude-opus-4-7
   - agent:claude-opus-4-7
@@ -19,9 +19,10 @@ Native Android client for the self-hosted [rssreader](https://github.com/psecor/
 
 - ✅ Google sign-in via Credential Manager → backend exchange for bearer token
 - ✅ Feed list with categories, "All items" view, per-feed item list
-- ✅ Article reading (HTML render in WebView), mark-on-open
+- ✅ Article reading (HTML render in WebView), mark-on-open, hero thumbnail, tap-title to open source, external routing for body links
 - ✅ Mark read/unread: article toggle, row swipe, bulk "mark all read"
 - ✅ Local search across title/description/author
+- ✅ Persistent Unread-only filter with empty-state messaging
 - ✅ 50-per-page pagination on item lists (incremental load on scroll)
 - ✅ Pull-to-refresh; periodic WorkManager sync; post-sign-in sync
 - ✅ Delta sync (`since=` cursors), offline write queue with retry
@@ -51,6 +52,7 @@ app/src/main/java/net/secorp/rssreader/
 
 app/schemas/                        Room schema JSON, one file per DB version
 local.properties.example            Required config keys, gitignored real file
+ANDROID_TEMPLATE.md                 Bootstrapping notes distilled from this project, for new Android clients
 ```
 
 ## Architecture
@@ -145,6 +147,9 @@ Sync cursor is captured *before* the network calls so anything modified mid-sync
 
 **Other projects:**
 - [psecor/rssreader](https://github.com/psecor/rssreader) — backend + web client this app authenticates against and syncs with.
+
+**Cross-repo docs:**
+- [LAUNCH_PLAN.md in psecor/rssreader](https://github.com/psecor/rssreader/blob/master/LAUNCH_PLAN.md) — cross-repo roadmap for shipping RSSReader as a paid subscription service on Play + App Store (invite-only closed beta). Phase B covers the Android work in this repo.
 
 **Topics:**
 - _none yet_
