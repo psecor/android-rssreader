@@ -24,10 +24,6 @@ object DatabaseModule {
     fun provideDatabase(@ApplicationContext context: Context): RssDatabase =
         Room.databaseBuilder(context, RssDatabase::class.java, "rssreader.db")
             .addMigrations(MIGRATION_1_2)
-            // Schema is still in flux during P2/P3; any unanticipated
-            // upgrade path drops to a clean DB and a fresh sync rather
-            // than crashing on launch. Tighten before v1 ship.
-            .fallbackToDestructiveMigration()
             .build()
 
     @Provides

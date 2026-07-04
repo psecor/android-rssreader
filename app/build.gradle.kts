@@ -72,6 +72,12 @@ android {
         arg("room.schemaLocation", "$projectDir/schemas")
     }
 
+    // Expose the exported Room schemas to instrumented tests so
+    // MigrationTestHelper can locate the v(n) JSON snapshots at runtime.
+    sourceSets {
+        getByName("androidTest").assets.srcDir(files("$projectDir/schemas"))
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -119,4 +125,8 @@ dependencies {
     implementation(libs.google.id)
 
     implementation(libs.androidx.security.crypto)
+
+    androidTestImplementation(libs.androidx.test.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.room.testing)
 }

@@ -131,7 +131,7 @@ Sync cursor is captured *before* the network calls so anything modified mid-sync
 
 ## Gotchas
 
-1. **`fallbackToDestructiveMigration()` is still on.** `DatabaseModule.provideDatabase` falls back to wiping the DB on any unrecognized schema version. Migrations exist (`data/db/Migrations.kt`) but the fallback masks bugs in them. Tighten before any real release; verify each migration with a test.
+1. **Every schema-version bump needs a migration + a test.** `DatabaseModule.provideDatabase` no longer falls back to destructive migration, so any unrecognized version throws at launch. For each bump: add a `Migration(from, to)` in `data/db/Migrations.kt`, register it on the DB builder, commit the new exported schema JSON under `app/schemas/`, and add a `MigrationTest` case that seeds v(n-1) data and asserts it survives. See `app/src/androidTest/java/net/secorp/rssreader/data/db/MigrationTest.kt` for the pattern.
 
 2. **Compose `TextField` value must not be bound to a VM `StateFlow`.** Binding `value = state.query` (where `state` is collected from a StateFlow) round-trips every keystroke through the VM and back a frame later, racing subsequent keystrokes — characters get dropped, reordered, or stuck. `ItemListScreen` keeps the search field's text in `rememberSaveable { mutableStateOf("") }` and pushes to the VM via `onValueChange`. Repeat the pattern for any new input control.
 

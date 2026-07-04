@@ -28,6 +28,9 @@ googleId = "1.1.1"
 
 securityCrypto = "1.1.0-alpha06"
 
+androidxTestJunit = "1.2.1"
+androidxTestRunner = "1.6.2"
+
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidxCoreKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "androidxLifecycle" }
@@ -58,6 +61,7 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 
 work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }
 
@@ -68,6 +72,9 @@ androidx-credentials-play-services-auth = { group = "androidx.credentials", name
 google-id = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleId" }
 
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
+
+androidx-test-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
