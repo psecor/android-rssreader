@@ -117,11 +117,34 @@ class RssRepository @Inject constructor(
      * local feed items. Items the local DB doesn't have yet are ignored
      * (UPDATE matches zero rows) — they'll come in through future item
      * syncs if they're still within the window.
+     *
+     * Pages through the endpoint until it returns fewer than [pageSize]
+     * rows. A single vacation-catch-up mark-all-read on the web easily
+     * produces >500 changed rows; without this loop the tail was silently
+     * dropped and the cursor advanced past them, losing them forever.
+     * Cap of [maxStatuses] guards against a runaway pull if the delta
+     * window is truly pathological.
      */
-    suspend fun refreshReadStatuses(since: Instant?) {
-        val statuses = rssApi.listReadStatuses(since = since?.toString())
-        for (s in statuses) {
-            feedItemDao.setRead(id = s.feedItemId, isRead = s.isRead, readAt = s.readAt)
+    suspend fun refreshReadStatuses(
+        since: Instant?,
+        pageSize: Int = 500,
+        maxStatuses: Int = MAX_STATUSES_PER_SYNC,
+    ) {
+        var offset = 0
+        var applied = 0
+        while (applied < maxStatuses) {
+            val page = rssApi.listReadStatuses(
+                since = since?.toString(),
+                limit = pageSize,
+                offset = offset,
+            )
+            if (page.isEmpty()) break
+            for (s in page) {
+                feedItemDao.setRead(id = s.feedItemId, isRead = s.isRead, readAt = s.readAt)
+            }
+            applied += page.size
+            if (page.size < pageSize) break
+            offset += page.size
         }
     }
 
@@ -187,5 +210,20 @@ class RssRepository @Inject constructor(
         // a clean install from trying to ingest the entire user history on
         // the first sync. Independent of UI page size.
         const val MAX_ITEMS_PER_SYNC = 500
+
+        // Soft ceiling on how many read-status rows to apply in one sync.
+        // Much higher than the items cap because it must accommodate two
+        // scenarios that both blow past a small limit:
+        //  1. Backlog recovery — when a user upgrades from an older version
+        //     that lost rows to the pre-pagination bug, resetting the cursor
+        //     causes a re-pull of every status row the server has for them,
+        //     which can be tens of thousands over the lifetime of an account.
+        //  2. Long-vacation catch-up — a web-side bulk mark-all-read on
+        //     return from a break can touch several thousand rows in one go.
+        // Server orders by updatedAt asc, so hitting this cap would silently
+        // drop the *most recent* updates (the ones most likely to be stale)
+        // while the cursor advances past them — same bug as before. Keep
+        // this high enough that realistic accounts never hit it.
+        const val MAX_STATUSES_PER_SYNC = 100_000
     }
 }
