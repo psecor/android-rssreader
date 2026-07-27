@@ -80,7 +80,7 @@ The UI reads from Room via Flow — never from the network directly. Network cha
 | `FeedItemEntity` | Single article | `id`, `feedId`, `title`, `link`, `description`, `isRead`, `readAt`, `pubDate`, `thumbnail` |
 | `PendingActionEntity` | Queued mark-read mutation | `itemId` (PK), `isRead`, `queuedAt` |
 
-Schema JSON snapshots live in `app/schemas/<package>.RssDatabase/<version>.json`, committed and one file per DB version. Migrations land in `data/db/Migrations.kt`. The DB builder currently uses `fallbackToDestructiveMigration()` while the schema is still moving; see Gotchas before any real release.
+Schema JSON snapshots live in `app/schemas/<package>.RssDatabase/<version>.json`, committed and one file per DB version. Migrations land in `data/db/Migrations.kt`. Destructive fallback has been removed from the DB builder — every version bump requires an explicit `Migration` plus a `MigrationTest` case (see Gotchas #1).
 
 ## Configuration
 
