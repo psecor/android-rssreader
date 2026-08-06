@@ -2,7 +2,7 @@
 project: android-rssreader
 status: in-progress
 status_description: "V1 daily-use scope feature-complete in debug builds; no release pipeline yet."
-last_updated: 2026-07-04
+last_updated: 2026-08-06
 last_updated_by:
   - agent:sweeper-claude-opus-4-7
   - agent:claude-opus-4-7
@@ -23,6 +23,7 @@ Native Android client for the self-hosted [rssreader](https://github.com/psecor/
 - ✅ Mark read/unread: article toggle, row swipe, bulk "mark all read"
 - ✅ Local search across title/description/author
 - ✅ Persistent Unread-only filter with empty-state messaging
+- ✅ Launcher icon notification dot backed by a silent ongoing "N unread articles" notification
 - ✅ 50-per-page pagination on item lists (incremental load on scroll)
 - ✅ Pull-to-refresh; periodic WorkManager sync; post-sign-in sync
 - ✅ Delta sync (`since=` cursors), offline write queue with retry
@@ -49,6 +50,7 @@ app/src/main/java/net/secorp/rssreader/
 │   └── sync/                       SyncScheduler + SyncWorker + WriteSyncWorker
 ├── di/                             Hilt modules
 └── ui/                             One package per screen (login, feeds, items, article)
+    └── notify/UnreadNotifier.kt    Icon notification-dot + persistent "N unread" notification
 
 app/schemas/                        Room schema JSON, one file per DB version
 local.properties.example            Required config keys, gitignored real file
