@@ -21,6 +21,12 @@ interface FeedItemDao {
      * Coil thumbnail-load OOM that an unbounded "All items" list used to
      * trigger.
      */
+    /**
+     * One-shot page load. The item list intentionally does NOT observe this
+     * as a Flow so that marking an item read in-place does not cause the
+     * row to disappear from the visible list until the user asks for a
+     * refresh. See ItemListViewModel for the snapshot+patch model.
+     */
     @Query(
         """
         SELECT * FROM feed_items
@@ -33,15 +39,15 @@ interface FeedItemDao {
         LIMIT :limit OFFSET :offset
         """
     )
-    fun observePage(
+    suspend fun getPage(
         feedId: Long?,
         onlyUnread: Boolean,
         searchPattern: String,
         limit: Int,
         offset: Int,
-    ): Flow<List<FeedItemEntity>>
+    ): List<FeedItemEntity>
 
-    /** Total rows matching the same filter set [observePage] uses. */
+    /** Total rows matching the same filter set [getPage] uses. */
     @Query(
         """
         SELECT COUNT(*) FROM feed_items
@@ -52,11 +58,11 @@ interface FeedItemDao {
                OR author LIKE :searchPattern)
         """
     )
-    fun observeCount(
+    suspend fun countMatching(
         feedId: Long?,
         onlyUnread: Boolean,
         searchPattern: String,
-    ): Flow<Int>
+    ): Int
 
     @Query(
         """

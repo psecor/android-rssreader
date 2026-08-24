@@ -4,6 +4,9 @@ import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import net.secorp.rssreader.data.api.RssApi
 import net.secorp.rssreader.data.api.toEntity
 import net.secorp.rssreader.data.db.dao.CategoryDao
@@ -37,14 +40,18 @@ class RssRepository @Inject constructor(
     fun observeFeedsByCategory(categoryId: Long): Flow<List<FeedEntity>> =
         feedDao.observeByCategory(categoryId)
 
-    fun observeItemsPage(
+    /**
+     * One-shot page snapshot for the item list. See [readPatches] for how the
+     * list stays in sync with mark-read toggles between snapshots.
+     */
+    suspend fun getItemsPage(
         feedId: Long?,
         onlyUnread: Boolean,
         query: String = "",
         pageSize: Int,
         pageIndex: Int,
-    ): Flow<List<FeedItemEntity>> =
-        feedItemDao.observePage(
+    ): List<FeedItemEntity> =
+        feedItemDao.getPage(
             feedId = feedId,
             onlyUnread = onlyUnread,
             searchPattern = toLikePattern(query),
@@ -52,12 +59,12 @@ class RssRepository @Inject constructor(
             offset = pageIndex * pageSize,
         )
 
-    fun observeItemsCount(
+    suspend fun countItems(
         feedId: Long?,
         onlyUnread: Boolean,
         query: String = "",
-    ): Flow<Int> =
-        feedItemDao.observeCount(
+    ): Int =
+        feedItemDao.countMatching(
             feedId = feedId,
             onlyUnread = onlyUnread,
             searchPattern = toLikePattern(query),
@@ -72,6 +79,21 @@ class RssRepository @Inject constructor(
     fun observeTotalUnread(): Flow<Int> = feedItemDao.observeTotalUnread()
 
     fun observeItem(id: Long): Flow<FeedItemEntity?> = feedItemDao.observeById(id)
+
+    /**
+     * Fires every time a single item's read state is toggled. The item list
+     * subscribes to this so it can patch the visible snapshot in place when
+     * an article is opened (auto-mark) or a row is swiped, without triggering
+     * a re-query that would drop the row in Unread-only mode.
+     *
+     * Bulk operations (mark-all-read) intentionally do NOT emit here — the
+     * item-list VM handles them with a whole-list patch instead of hundreds
+     * of individual events.
+     */
+    val readPatches: SharedFlow<ReadPatch> get() = _readPatches
+    private val _readPatches = MutableSharedFlow<ReadPatch>(extraBufferCapacity = 64)
+
+    data class ReadPatch(val itemId: Long, val isRead: Boolean, val readAt: Instant?)
 
     suspend fun refreshCategories() {
         val entities = rssApi.listCategories().map { it.toEntity() }
@@ -182,10 +204,12 @@ class RssRepository @Inject constructor(
      */
     suspend fun markRead(itemId: Long, isRead: Boolean) {
         val now = Instant.now()
-        feedItemDao.setRead(itemId, isRead = isRead, readAt = if (isRead) now else null)
+        val readAt = if (isRead) now else null
+        feedItemDao.setRead(itemId, isRead = isRead, readAt = readAt)
         pendingActionDao.upsert(
             PendingActionEntity(itemId = itemId, isRead = isRead, queuedAt = now)
         )
+        _readPatches.tryEmit(ReadPatch(itemId = itemId, isRead = isRead, readAt = readAt))
         syncScheduler.enqueueWritePush()
     }
 
