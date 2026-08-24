@@ -2,7 +2,7 @@
 project: android-rssreader
 status: in-progress
 status_description: "V1 daily-use scope feature-complete in debug builds; no release pipeline yet."
-last_updated: 2026-08-06
+last_updated: 2026-08-24
 last_updated_by:
   - agent:sweeper-claude-opus-4-7
   - agent:claude-opus-4-7
@@ -24,6 +24,7 @@ Native Android client for the self-hosted [rssreader](https://github.com/psecor/
 - ✅ Local search across title/description/author
 - ✅ Persistent Unread-only filter with empty-state messaging
 - ✅ Launcher icon notification dot backed by a silent ongoing "N unread articles" notification
+- ✅ Item list preserves scroll and keeps rows in place when marked read; read rows clear on next explicit refresh
 - ✅ 50-per-page pagination on item lists (incremental load on scroll)
 - ✅ Pull-to-refresh; periodic WorkManager sync; post-sign-in sync
 - ✅ Delta sync (`since=` cursors), offline write queue with retry
@@ -144,6 +145,8 @@ Sync cursor is captured *before* the network calls so anything modified mid-sync
 5. **App signing for Google sign-in is keystore-tied.** The Android OAuth client at Google Cloud is registered against the app's package name + signing SHA-1. Debug builds use the local debug keystore; a release build signed with a different key will fail to obtain ID tokens until that key's SHA-1 is added in Google Cloud Console.
 
 6. **`refreshAll` ordering matters.** Categories → Feeds → Items → ReadStatuses. Items have FK to Feeds, Feeds to Categories. Reversing the order either violates FK constraints during replace-all or briefly leaves the UI pointed at half-resolved data.
+
+7. **Item list is a snapshot + patch stream, not a live Flow off Room.** `ItemListViewModel` loads the visible page via `RssRepository.getItemsPage` (one-shot) and applies per-item `ReadPatch` events emitted by `markRead(itemId, isRead)` to mutate the visible list in place. If you "simplify" it back to `Flow<List<FeedItemEntity>>` off the DAO, marking an item read in Unread-only mode will drop the row from the list mid-scroll — which is the exact behavior this pattern exists to avoid. Re-snapshot triggers: filter/query/page change, pull-to-refresh completion. Background periodic syncs deliberately do NOT refresh the visible list — the user only sees new items when they ask for them. Bulk `markRead(ids, isRead)` skips the patch stream; the VM patches its own snapshot after the bulk call.
 
 ## Related
 
