@@ -87,12 +87,27 @@ fun ItemListScreen(
     val searchFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
-    // Jump to the top of the list whenever the page changes. Filter toggles,
-    // search open/close, and query edits all reset pageIndex to 0, which
-    // covers those cases too. Mark-all-read intentionally does NOT reset
-    // scroll — the rows stay in place, styled as read.
+    val scrollResetTick by viewModel.scrollResetTick.collectAsState()
+    // Jump to the top of the list on user actions that change the visible
+    // batch: page next/prev, filter/search toggles (which reset pageIndex
+    // to 0), and mark-all-read (which bumps scrollResetTick after a fresh
+    // snapshot). Both keys are compared against a rememberSaveable "last
+    // observed" so the LaunchedEffect doesn't scroll to top when the
+    // composition simply re-enters after nav-back from an article — that
+    // used to erase the user's scroll cursor every time they read one.
+    var lastPageIndex by rememberSaveable { mutableStateOf(state.pageIndex) }
+    var lastScrollResetTick by rememberSaveable { mutableStateOf(scrollResetTick) }
     LaunchedEffect(state.pageIndex) {
-        listState.scrollToItem(0)
+        if (state.pageIndex != lastPageIndex) {
+            listState.scrollToItem(0)
+            lastPageIndex = state.pageIndex
+        }
+    }
+    LaunchedEffect(scrollResetTick) {
+        if (scrollResetTick != lastScrollResetTick) {
+            listState.scrollToItem(0)
+            lastScrollResetTick = scrollResetTick
+        }
     }
     // Local source-of-truth for the TextField. Binding the field directly to
     // a StateFlow round-trips every keystroke through the VM and back, which

@@ -84,6 +84,15 @@ class ItemListViewModel @Inject constructor(
     /** Bumped after a pull-to-refresh sync completes, to force a re-snapshot. */
     private val _refreshTrigger = MutableStateFlow(0)
 
+    /**
+     * Bumped only by actions that should reset scroll to the top without also
+     * changing pageIndex — namely mark-all-read, which flushes the current page
+     * and shows the next batch. Distinct from _refreshTrigger because a normal
+     * pull-to-refresh preserves scroll.
+     */
+    private val _scrollResetTick = MutableStateFlow(0)
+    val scrollResetTick: StateFlow<Int> = _scrollResetTick.asStateFlow()
+
     private val _visibleItems = MutableStateFlow<List<FeedItemEntity>>(emptyList())
     private val _visibleTotalCount = MutableStateFlow(0)
 
@@ -240,22 +249,19 @@ class ItemListViewModel @Inject constructor(
     }
 
     /**
-     * Mark every unread item on the current page as read. Patches the visible
-     * snapshot directly rather than firing per-item ReadPatches — the bulk
-     * repo call is a single SQL UPDATE and doesn't emit patches. Rows stay
-     * in place styled as read; they clear on the next explicit refresh.
+     * Mark every unread item on the current page as read, then re-snapshot
+     * and scroll to top. Unlike opening an article or swiping a single row
+     * (both of which patch in place to preserve scroll), the bulk action is
+     * treated as an explicit "clear this batch, show me the next" gesture —
+     * so we refresh instead of leaving 50 just-read rows sitting on screen.
      */
     fun markAllVisibleRead() {
         val ids = _visibleItems.value.filter { !it.isRead }.map { it.id }
         if (ids.isEmpty()) return
         viewModelScope.launch {
             rssRepository.markRead(ids, isRead = true)
-            val now = java.time.Instant.now()
-            _visibleItems.update { list ->
-                list.map { row ->
-                    if (row.id in ids) row.copy(isRead = true, readAt = now) else row
-                }
-            }
+            _refreshTrigger.value += 1
+            _scrollResetTick.value += 1
         }
     }
 
