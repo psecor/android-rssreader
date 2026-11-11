@@ -24,7 +24,7 @@ Native Android client for the self-hosted [rssreader](https://github.com/psecor/
 - ✅ Local search across title/description/author
 - ✅ Persistent Unread-only filter with empty-state messaging
 - ✅ Launcher icon notification dot backed by a silent ongoing "N unread articles" notification
-- ✅ Item list preserves scroll and keeps rows in place when marked read; read rows clear on next explicit refresh
+- ✅ Item list preserves scroll (including on back-nav from an article) and keeps rows in place when marked read; read rows clear on next explicit refresh, or immediately via "mark all read"
 - ✅ 50-per-page pagination on item lists (incremental load on scroll)
 - ✅ Pull-to-refresh; periodic WorkManager sync; post-sign-in sync
 - ✅ Delta sync (`since=` cursors), offline write queue with retry
@@ -146,7 +146,7 @@ Sync cursor is captured *before* the network calls so anything modified mid-sync
 
 6. **`refreshAll` ordering matters.** Categories → Feeds → Items → ReadStatuses. Items have FK to Feeds, Feeds to Categories. Reversing the order either violates FK constraints during replace-all or briefly leaves the UI pointed at half-resolved data.
 
-7. **Item list is a snapshot + patch stream, not a live Flow off Room.** `ItemListViewModel` loads the visible page via `RssRepository.getItemsPage` (one-shot) and applies per-item `ReadPatch` events emitted by `markRead(itemId, isRead)` to mutate the visible list in place. If you "simplify" it back to `Flow<List<FeedItemEntity>>` off the DAO, marking an item read in Unread-only mode will drop the row from the list mid-scroll — which is the exact behavior this pattern exists to avoid. Re-snapshot triggers: filter/query/page change, pull-to-refresh completion. Background periodic syncs deliberately do NOT refresh the visible list — the user only sees new items when they ask for them. Bulk `markRead(ids, isRead)` skips the patch stream; the VM patches its own snapshot after the bulk call.
+7. **Item list is a snapshot + patch stream, not a live Flow off Room.** `ItemListViewModel` loads the visible page via `RssRepository.getItemsPage` (one-shot) and applies per-item `ReadPatch` events emitted by `markRead(itemId, isRead)` to mutate the visible list in place. If you "simplify" it back to `Flow<List<FeedItemEntity>>` off the DAO, marking an item read in Unread-only mode will drop the row from the list mid-scroll — which is the exact behavior this pattern exists to avoid. Re-snapshot triggers: filter/query/page change, pull-to-refresh completion, mark-all-read. Background periodic syncs deliberately do NOT refresh the visible list — the user only sees new items when they ask for them. Bulk `markRead(ids, isRead)` skips the patch stream; `markAllVisibleRead` instead bumps `_refreshTrigger` (re-snapshot) and `scrollResetTick` (scroll to top), treating it as "clear this batch, show me the next." Scroll-to-top in `ItemListScreen` is keyed on `pageIndex` and `scrollResetTick`, each compared against a `rememberSaveable` last-seen value — without that guard, the `LaunchedEffect` re-fires when the composition re-enters after back-nav from an article and wipes the user's scroll position.
 
 ## Related
 
