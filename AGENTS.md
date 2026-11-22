@@ -2,10 +2,11 @@
 project: android-rssreader
 status: in-progress
 status_description: "V1 daily-use scope feature-complete in debug builds; no release pipeline yet."
-last_updated: 2026-08-24
+last_updated: 2026-11-22
 last_updated_by:
   - agent:sweeper-claude-opus-4-7
   - agent:claude-opus-4-7
+  - agent:claude-fable-5-1
 wiki_schema_version: 1
 ---
 
@@ -21,6 +22,7 @@ Native Android client for the self-hosted [rssreader](https://github.com/psecor/
 - ✅ Feed list with categories, "All items" view, per-feed item list
 - ✅ Article reading (HTML render in WebView), mark-on-open, hero thumbnail, tap-title to open source, external routing for body links
 - ✅ Mark read/unread: article toggle, row swipe, bulk "mark all read"
+- ✅ "All caught up" empty state: animated 3D constellation head with red/green/blue neuron highlights (Canvas-drawn, procedural geometry)
 - ✅ Local search across title/description/author
 - ✅ Persistent Unread-only filter with empty-state messaging
 - ✅ Launcher icon notification dot backed by a silent ongoing "N unread articles" notification
@@ -51,7 +53,11 @@ app/src/main/java/net/secorp/rssreader/
 │   └── sync/                       SyncScheduler + SyncWorker + WriteSyncWorker
 ├── di/                             Hilt modules
 └── ui/                             One package per screen (login, feeds, items, article)
+    ├── common/WireframeHead.kt     Procedural 3D constellation head for the item-list empty state
     └── notify/UnreadNotifier.kt    Icon notification-dot + persistent "N unread" notification
+
+app/src/test/                       JVM unit tests (junit4) — currently HeadModelTest
+app/src/androidTest/                Instrumented tests — MigrationTest
 
 app/schemas/                        Room schema JSON, one file per DB version
 local.properties.example            Required config keys, gitignored real file
@@ -147,6 +153,8 @@ Sync cursor is captured *before* the network calls so anything modified mid-sync
 6. **`refreshAll` ordering matters.** Categories → Feeds → Items → ReadStatuses. Items have FK to Feeds, Feeds to Categories. Reversing the order either violates FK constraints during replace-all or briefly leaves the UI pointed at half-resolved data.
 
 7. **Item list is a snapshot + patch stream, not a live Flow off Room.** `ItemListViewModel` loads the visible page via `RssRepository.getItemsPage` (one-shot) and applies per-item `ReadPatch` events emitted by `markRead(itemId, isRead)` to mutate the visible list in place. If you "simplify" it back to `Flow<List<FeedItemEntity>>` off the DAO, marking an item read in Unread-only mode will drop the row from the list mid-scroll — which is the exact behavior this pattern exists to avoid. Re-snapshot triggers: filter/query/page change, pull-to-refresh completion, mark-all-read. Background periodic syncs deliberately do NOT refresh the visible list — the user only sees new items when they ask for them. Bulk `markRead(ids, isRead)` skips the patch stream; `markAllVisibleRead` instead bumps `_refreshTrigger` (re-snapshot) and `scrollResetTick` (scroll to top), treating it as "clear this batch, show me the next." Scroll-to-top in `ItemListScreen` is keyed on `pageIndex` and `scrollResetTick`, each compared against a `rememberSaveable` last-seen value — without that guard, the `LaunchedEffect` re-fires when the composition re-enters after back-nav from an article and wipes the user's scroll position.
+
+8. **Kotlin `object` properties initialise in declaration order — anything an `init` block touches must be declared above it.** Otherwise the first reference is a null array/object and the class fails with `ExceptionInInitializerError`, which on-device shows up as a crash the first time that screen composes (bit `HeadModel` in `ui/common/WireframeHead.kt`). Neither the compiler nor lint flags it. Guard: any pure-Kotlin `object` with non-trivial init gets a JVM unit test that simply references it (`./gradlew testDebugUnitTest`, seconds, no device) — see `app/src/test/.../HeadModelTest.kt`.
 
 ## Related
 
