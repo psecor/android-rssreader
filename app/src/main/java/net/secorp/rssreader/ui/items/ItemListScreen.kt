@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -74,6 +76,7 @@ import coil.compose.AsyncImage
 import java.time.Duration
 import java.time.Instant
 import net.secorp.rssreader.data.db.entity.FeedItemEntity
+import net.secorp.rssreader.ui.common.WireframeHead
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -217,16 +220,11 @@ fun ItemListScreen(
             ) {
                 if (state.items.isEmpty()) {
                     item {
-                        Box(
+                        EmptyItemsState(
+                            query = state.query,
+                            onlyUnread = state.onlyUnread,
                             modifier = Modifier.fillParentMaxSize(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = "No new items",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        )
                     }
                 } else {
                     items(items = state.items, key = { it.id }) { item ->
@@ -239,6 +237,44 @@ fun ItemListScreen(
                         HorizontalDivider()
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Empty-state for the item list. A search with no hits gets a plain message;
+ * a genuinely empty view (everything read, or a feed with nothing in it) gets
+ * the wireframe head as a "you're done here" reward.
+ */
+@Composable
+private fun EmptyItemsState(
+    query: String,
+    onlyUnread: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        if (query.isNotBlank()) {
+            Text(
+                text = "No matches for “$query”",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                WireframeHead(modifier = Modifier.size(360.dp))
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = if (onlyUnread) "All caught up" else "Nothing here",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = if (onlyUnread) "No unread items. Pull down to check for new ones." else "Pull down to refresh.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
             }
         }
     }

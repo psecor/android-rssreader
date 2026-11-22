@@ -126,6 +126,7 @@ dependencies {
 
     implementation(libs.androidx.security.crypto)
 
+    testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.room.testing)
