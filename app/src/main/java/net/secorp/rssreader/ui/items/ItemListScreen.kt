@@ -270,7 +270,11 @@ private fun EmptyItemsState(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = if (onlyUnread) "No unread items. Pull down to check for new ones." else "Pull down to refresh.",
+                    text = if (onlyUnread) {
+                        "No unread items. Drag the head to spin it, or pull down to check for new ones."
+                    } else {
+                        "Drag the head to spin it, or pull down to refresh."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,

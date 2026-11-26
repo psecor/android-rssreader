@@ -2,7 +2,7 @@
 project: android-rssreader
 status: in-progress
 status_description: "V1 daily-use scope feature-complete in debug builds; no release pipeline yet."
-last_updated: 2026-11-22
+last_updated: 2026-11-26
 last_updated_by:
   - agent:sweeper-claude-opus-4-7
   - agent:claude-opus-4-7
@@ -22,7 +22,7 @@ Native Android client for the self-hosted [rssreader](https://github.com/psecor/
 - ✅ Feed list with categories, "All items" view, per-feed item list
 - ✅ Article reading (HTML render in WebView), mark-on-open, hero thumbnail, tap-title to open source, external routing for body links
 - ✅ Mark read/unread: article toggle, row swipe, bulk "mark all read"
-- ✅ "All caught up" empty state: animated 3D constellation head with red/green/blue neuron highlights (Canvas-drawn, procedural geometry)
+- ✅ "All caught up" empty state: animated 3D constellation head with red/green/blue neuron highlights (Canvas-drawn, procedural geometry); drag sideways to spin, fling coasts then eases back to the sway (mirrors the web client's `WireframeHead.tsx`)
 - ✅ Local search across title/description/author
 - ✅ Persistent Unread-only filter with empty-state messaging
 - ✅ Launcher icon notification dot backed by a silent ongoing "N unread articles" notification
@@ -56,7 +56,7 @@ app/src/main/java/net/secorp/rssreader/
     ├── common/WireframeHead.kt     Procedural 3D constellation head for the item-list empty state
     └── notify/UnreadNotifier.kt    Icon notification-dot + persistent "N unread" notification
 
-app/src/test/                       JVM unit tests (junit4) — currently HeadModelTest
+app/src/test/                       JVM unit tests (junit4) — HeadModelTest, HeadSpinTest
 app/src/androidTest/                Instrumented tests — MigrationTest
 
 app/schemas/                        Room schema JSON, one file per DB version

@@ -1,15 +1,18 @@
 package net.secorp.rssreader.ui.common
 
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -18,6 +21,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PointMode
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.abs
@@ -27,6 +33,7 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -35,6 +42,11 @@ import kotlin.random.Random
  * neighbours, dense where there is facial detail and sparse across the skull
  * — swaying slowly between profile and three-quarter view. Used as the
  * "all caught up" empty-state illustration.
+ *
+ * It is also a toy: drag sideways to spin it. A fling keeps it turning with
+ * friction, then it eases back into the idle sway ([HeadSpin]). The gesture
+ * only locks on once the finger moves horizontally past touch slop, so a
+ * straight pull-down still reaches the list's pull-to-refresh.
  *
  * Geometry is procedural ([HeadModel]): a sculpted profile of horizontal
  * cross-sections with Gaussian bumps for brow, eye sockets, nose, lips, chin
@@ -50,31 +62,62 @@ fun WireframeHead(
     lineColor: Color = MaterialTheme.colorScheme.primary,
     dotColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
-    val transition = rememberInfiniteTransition(label = "wireframeHead")
-    // Sway between full profile (nose pointing left) and three-quarter view.
-    val yaw by transition.animateFloat(
-        initialValue = -1.62f,
-        targetValue = -0.82f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 9_000),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "yaw",
-    )
-    val pitch by transition.animateFloat(
-        initialValue = -0.06f,
-        targetValue = 0.06f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 6_500),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "pitch",
-    )
+    val spin = remember { HeadSpin() }
+    // Only the draw phase reads these, so a frame tick redraws the Canvas
+    // without recomposing anything.
+    var yaw by remember { mutableFloatStateOf(spin.yaw) }
+    var pitch by remember { mutableFloatStateOf(spin.pitch) }
+
+    LaunchedEffect(spin) {
+        val startNanos = withFrameNanos { it }
+        var lastNanos = startNanos
+        while (true) {
+            withFrameNanos { now ->
+                val dt = ((now - lastNanos) / 1e9f).coerceIn(0f, 0.05f)
+                lastNanos = now
+                spin.step(nowMs = (now - startNanos) / 1_000_000, dtSec = dt)
+                yaw = spin.yaw
+                pitch = spin.pitch
+            }
+        }
+    }
 
     val model = remember { HeadModel }
     val scratch = remember { RenderScratch(model.pointCount) }
 
-    Canvas(modifier = modifier) {
+    Canvas(
+        modifier = modifier.pointerInput(spin) {
+            val radPerPx = DRAG_RAD_PER_DP / density
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                val tracker = VelocityTracker()
+                tracker.addPosition(down.uptimeMillis, down.position)
+                // Horizontal slop only: a vertical pull belongs to pull-to-refresh.
+                val first = awaitHorizontalTouchSlopOrCancellation(down.id) { change, overSlop ->
+                    change.consume()
+                    tracker.addPosition(change.uptimeMillis, change.position)
+                    spin.dragStart()
+                    spin.dragBy(overSlop * radPerPx, 0f)
+                } ?: return@awaitEachGesture
+                var lastMoveAt = first.uptimeMillis
+                drag(first.id) { change ->
+                    change.consume()
+                    tracker.addPosition(change.uptimeMillis, change.position)
+                    val delta = change.positionChange()
+                    spin.dragBy(delta.x * radPerPx, delta.y * radPerPx)
+                    lastMoveAt = change.uptimeMillis
+                }
+                // A pause before letting go means "put it down", not "fling it".
+                val upAt = currentEvent.changes.firstOrNull()?.uptimeMillis ?: lastMoveAt
+                if (upAt - lastMoveAt > 100) {
+                    spin.release(0f, 0f)
+                } else {
+                    val v = tracker.calculateVelocity()
+                    spin.release(v.x * radPerPx, v.y * radPerPx)
+                }
+            }
+        },
+    ) {
         val scale = size.minDimension * 0.34f
         val cx = size.width / 2f
         val cy = size.height / 2f - scale * 0.10f
@@ -159,6 +202,128 @@ private val NEURON_COLOURS = listOf(
 private fun depthAlpha(band: Int): Float {
     val t = (band + 0.5f) / DEPTH_BANDS
     return 0.08f + 0.92f * t.pow(2.0f)
+}
+
+/** Radians of rotation per dp of finger travel (matches the web client's per-CSS-px rate). */
+private const val DRAG_RAD_PER_DP = 0.012f
+
+/**
+ * Orientation state machine for the head, mirroring the web client's
+ * `WireframeHead.tsx`. Pure Kotlin so it can be unit-tested; the composable
+ * feeds it frame ticks and gesture deltas. Angles in radians, time in ms
+ * since the head appeared.
+ */
+internal class HeadSpin {
+    enum class Mode {
+        /** Idle sway between profile and three-quarter view. */
+        AUTO,
+        /** Following the finger. */
+        DRAG,
+        /** Spinning down under friction after release. */
+        COAST,
+        /** Easing back into the sway. */
+        RETURN,
+    }
+
+    var mode: Mode = Mode.AUTO
+        private set
+    var yaw: Float = autoYaw(0L)
+        private set
+    var pitch: Float = autoPitch(0L)
+        private set
+
+    private var vYaw = 0f
+    private var vPitch = 0f
+    private var nowMs = 0L
+    private var releasedAt = 0L
+    private var trackYaw = 0f
+    private var trackPitch = 0f
+
+    fun step(nowMs: Long, dtSec: Float) {
+        this.nowMs = nowMs
+        when (mode) {
+            Mode.AUTO -> {
+                yaw = autoYaw(nowMs)
+                pitch = autoPitch(nowMs)
+            }
+            Mode.DRAG -> Unit
+            Mode.COAST -> {
+                yaw += vYaw * dtSec
+                pitch = clampPitch(pitch + vPitch * dtSec)
+                val decay = exp(-FRICTION * dtSec)
+                vYaw *= decay
+                vPitch *= decay
+                if (nowMs - releasedAt > IDLE_BEFORE_RETURN_MS && abs(vYaw) < 0.05f) {
+                    mode = Mode.RETURN
+                    trackYaw = autoYaw(nowMs)
+                    trackPitch = autoPitch(nowMs)
+                }
+            }
+            Mode.RETURN -> {
+                // Ride along with the sway, then close the remaining gap
+                // exponentially. Chasing the moving target alone would leave a
+                // standing lag and never satisfy the exit test below.
+                val targetYaw = autoYaw(nowMs)
+                val targetPitch = autoPitch(nowMs)
+                yaw += targetYaw - trackYaw
+                pitch += targetPitch - trackPitch
+                trackYaw = targetYaw
+                trackPitch = targetPitch
+                val k = 1f - exp(-RETURN_RATE * dtSec)
+                val dYaw = wrapAngle(targetYaw - yaw)
+                val dPitch = targetPitch - pitch
+                yaw += dYaw * k
+                pitch += dPitch * k
+                if (abs(dYaw) < 0.003f && abs(dPitch) < 0.003f) mode = Mode.AUTO
+            }
+        }
+    }
+
+    fun dragStart() {
+        mode = Mode.DRAG
+        vYaw = 0f
+        vPitch = 0f
+    }
+
+    fun dragBy(dYaw: Float, dPitch: Float) {
+        yaw += dYaw
+        pitch = clampPitch(pitch + dPitch)
+    }
+
+    /** Velocities in rad/s; zero to set the head down where it is. */
+    fun release(vYaw: Float, vPitch: Float) {
+        this.vYaw = clampSpin(vYaw)
+        this.vPitch = clampSpin(vPitch)
+        releasedAt = nowMs
+        mode = Mode.COAST
+    }
+
+    companion object {
+        const val PITCH_LIMIT = 0.7f
+        private const val MAX_SPIN = 12f // rad/s
+        private const val FRICTION = 2.5f // per second
+        private const val RETURN_RATE = 1.8f // per second
+        private const val IDLE_BEFORE_RETURN_MS = 1500L
+
+        /** Sway between full profile (nose pointing left) and three-quarter view. */
+        fun autoYaw(tMs: Long): Float = -1.62f + 0.8f * sway(tMs, 9_000)
+        fun autoPitch(tMs: Long): Float = -0.06f + 0.12f * sway(tMs, 6_500)
+
+        /** Ping-pong 0→1→0 over 2×period with an ease-in-out. */
+        private fun sway(tMs: Long, periodMs: Int): Float {
+            val phase = (tMs % (2 * periodMs)).toFloat() / periodMs
+            val tri = if (phase <= 1f) phase else 2f - phase
+            return 0.5f - 0.5f * cos(PI.toFloat() * tri)
+        }
+
+        private fun wrapAngle(a: Float): Float {
+            val twoPi = (2 * PI).toFloat()
+            return a - twoPi * (a / twoPi).roundToInt()
+        }
+
+        private fun clampPitch(p: Float) = p.coerceIn(-PITCH_LIMIT, PITCH_LIMIT)
+        private fun clampSpin(v: Float) = v.coerceIn(-MAX_SPIN, MAX_SPIN)
+    }
 }
 
 internal class RenderScratch(pointCount: Int) {
